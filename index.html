@@ -84,7 +84,8 @@
     <p class="sub">Every answer is worked out twice: by this Earth-centred model, read back from its own geometry, and the heliocentric way, from Sun-centred positions. The two columns should agree.</p>
     <form id="calc-form" class="cform">
       <label class="wide">Object<select id="c-obj"></select></label>
-      <label>Date and time (UTC)<input type="datetime-local" id="c-time" step="60"></label>
+      <label>Date (UTC)<input type="date" id="c-date" required></label>
+      <label>Time (UTC, 24-hour)<input type="text" id="c-clock" inputmode="numeric" placeholder="HH:MM" pattern="[0-2]?[0-9]:[0-5][0-9]" maxlength="5" autocomplete="off"></label>
       <label>Read the model as<select id="c-geom"><option value="flex">Flexing spheres</option><option value="round">Round spheres</option></select></label>
       <label>Latitude (°N)<input type="number" id="c-lat" step="0.0001" min="-90" max="90" value="25.2048"></label>
       <label>Longitude (°E)<input type="number" id="c-lon" step="0.0001" min="-180" max="180" value="55.2708"></label>
@@ -104,6 +105,7 @@
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="20" cy="20" r="10" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><circle cx="20" cy="20" r="2.2" fill="#9ec4ff"/></svg>
       <span class="wm">a different lens</span>
+      <button class="scalechip" id="scale-chip" type="button">Not to scale · what is real?</button>
     </div>
     <nav class="warpbar" aria-label="Jump to scale">
       <button data-view="earth">Earth</button>
@@ -140,6 +142,14 @@
       <h2>View and centre</h2>
       <p class="lead">One logarithmic map holds everything: each ten-fold step in distance moves the same amount outward. Directions are always exact.</p>
       <p class="statement-s">No law of physics or mathematics is broken: the same universe, seen from a frame in which Earth is at rest.</p>
+      <div class="group" id="scale-group"><h3>What is drawn to scale</h3>
+        <ul class="scale-list">
+          <li><b>Exact.</b> Every direction from Earth, and every distance, time and position the calculator reports.</li>
+          <li><b>Compressed.</b> Distances on screen follow a logarithmic scale: each power of ten takes the same space.</li>
+          <li><b>Enlarged.</b> Planets and moons are drawn far larger than true scale, moon orbits around their planets are shrunk, and with the Sun at the centre the Moon's distance from Earth is drawn sixty times larger.</li>
+          <li><b>Representative, not catalogued.</b> The main asteroid belt and Jupiter's Trojans, the shape of the Milky Way, galaxies beyond about two billion light-years, and the pattern on the microwave background (only its large-scale warm and cool sides are real).</li>
+          <li><b>Approximate.</b> Where Saturn's and Mars's moons are along their orbits; comet and asteroid orbits far from their measured epoch.</li>
+        </ul></div>
       <div class="group"><h3>Centre</h3>
         <div class="seg"><button id="c-earth" aria-pressed="true">Earth</button><button id="c-sun" aria-pressed="false">Sun</button></div>
         <p class="note" id="centre-note">Earth sits still at the centre. Click the Sun to move the origin there.</p></div>
@@ -150,7 +160,7 @@
         <p class="note"><b>Round spheres</b> keep perfect spheres; depth means rank, so light paths curve on this map. <b>Flexing spheres</b> keep true distances and straight light; each sphere flexes just enough to hold its planet, and the spheres never touch. From Earth both look identical, and with the Sun as centre the flexing view shows every orbit as its true ellipse.</p></div>
       <div class="group"><h3>Frame</h3>
         <div class="seg"><button id="f-earth" aria-pressed="true">Earth fixed</button><button id="f-star" aria-pressed="false">Stars fixed</button></div>
-        <p class="note" id="frame-note">The Muhit turns once per sidereal day (23 h 56 m) and carries every sphere with it.</p>
+        <p class="note" id="frame-note">In this frame the whole sky, described as al-Muhit, turns once per sidereal day (23 h 56 m).</p>
         <button class="btn" id="skyview" aria-pressed="false">Stand on Earth and look up</button></div>
     </section>
     <section class="pane" data-pane="light">
@@ -204,7 +214,7 @@
         <label class="tog"><input type="checkbox" id="l-glow" checked><span class="sw"></span>Glow</label>
       </div>
       <div class="group"><h3>Yearly wobble of the stars</h3>
-        <p class="note">Telescopes measure two yearly shifts in every star. They are under 21″, so they are magnified here. In the Earth-fixed model the eighth sphere carries both.</p>
+        <p class="note">Telescopes measure two yearly shifts in every star. They are under 21″, so they are magnified here. In the Earth-fixed description both appear as a yearly motion of the eighth sphere.</p>
         <div class="range"><div class="row"><span>Aberration (20.5″)</span><output id="ab-o">off</output></div><input type="range" id="ab" min="0" max="3" step="0.01" value="0" aria-label="Aberration magnification"></div>
         <div class="range"><div class="row"><span>Parallax (up to 0.77″)</span><output id="px-o">off</output></div><input type="range" id="px" min="0" max="5" step="0.01" value="0" aria-label="Parallax magnification"></div></div>
     </section>
@@ -282,6 +292,21 @@
   <div class="panel" id="toast" role="status"></div>
 </div>
 
+<script>
+// If the model cannot start, say why instead of spinning forever.
+(function(){
+  function show(title, html){ var L=document.getElementById('loading'); if(!L || L.classList.contains('err')) return; L.hidden=false; L.classList.add('err');
+    L.innerHTML='<div class="errbox"><h2>'+title+'</h2><p>'+html+'</p><button type="button" onclick="location.reload()">Reload</button></div>'; }
+  var gl=false; try{ var c=document.createElement('canvas'); gl=!!(c.getContext('webgl2')||c.getContext('webgl')); }catch(e){}
+  if(!gl) show('This browser cannot draw the 3D model','The model needs WebGL. Turn on hardware acceleration in your browser settings, or open the page in a recent Chrome, Edge, Firefox or Safari. The <a href="paper.html">paper</a> works without it.');
+  var loading=function(){ var L=document.getElementById('loading'); return L && !L.hidden; };
+  window.addEventListener('error',function(e){ if(!loading()) return; var tg=e.target;
+    if(tg && tg.tagName && tg.tagName!=='SCRIPT') return;   // a missing font or image is not fatal
+    show('The model could not start', tg && tg.tagName==='SCRIPT' ? 'A program file did not load ('+(tg.src||'').split('/').pop()+'). Check your connection and reload.' : String(e.message||'A script error').replace(/^Uncaught (Error: )?/,'')+'. Check your connection and reload.'); }, true);
+  window.addEventListener('unhandledrejection',function(e){ if(loading()) show('The model could not load its data',((e.reason&&e.reason.message)||'A data file did not arrive')+'. Check your connection and reload.'); });
+  setTimeout(function(){ var m=document.getElementById('loading-msg'); if(loading() && m) m.textContent='Still loading. On a slow connection this takes a little longer.'; }, 15000);
+})();
+</script>
 <script src="js/vendor/astronomy.browser.min.js"></script>
 <script type="module" src="js/main.js"></script>
 <noscript><p style="color:#ccc;font-family:sans-serif;padding:24px">This model needs JavaScript and WebGL.</p></noscript>

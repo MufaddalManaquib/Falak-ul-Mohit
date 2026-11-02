@@ -7,7 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const A = window.Astronomy;
-const getJSON = u => fetch(u).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
+const getJSON = u => fetch(u).catch(()=>{ throw new Error(`Could not download ${u}`); }).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
 const [U, MINOR] = await Promise.all([getJSON('data/universe.json'), getJSON('data/minor.json')]);
 const SKY = U;
 const AU_KM = 149597870.7, C_AU_DAY = 173.1446326846693, LIMB_DEFL = 1.751;
@@ -29,7 +29,7 @@ const INTELLECTS = [
 ];
 const HNOTE = {
   Moon:'Governs the Moon’s sphere and the world of generation and corruption beneath it. In the Ṭayyibī ḥaqāʾiq the tenth is Adam al-Rūḥānī, who fell from the third rank to the tenth and became the mudabbir of the physical world.',
-  Muhit:'Begins past the particle horizon, 46 billion light-years away: the farthest distance from which any signal could ever have reached us. Nothing beyond it can be observed, so its thickness neither confirms nor breaks any law. Here its outer face is drawn 10^1000 times farther than the observable edge, on the same logarithmic scale. Its daily turn carries every sphere inside it.',
+  Muhit:'Begins past the particle horizon, 46 billion light-years away: the farthest distance from which any signal could ever have reached us. Nothing beyond it can be observed, so its thickness neither confirms nor breaks any law. Here its outer face is drawn 10^1000 times farther than the observable edge, on the same logarithmic scale. In the Earth-fixed description its daily turn is the turning of the whole sky.',
   Stars:'The sphere of the twelve buruj, every star, and every galaxy, out to the edge of the observable universe.',
 };
 const INT = Object.fromEntries(INTELLECTS.filter(i=>i.key).map(i=>[i.key,i]));
@@ -129,7 +129,7 @@ function dispEarth(s, out){
 
 // ---------- renderer ----------
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true});
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
 const DPR_MAX=Math.min(devicePixelRatio, 1.5); let dpr=Math.min(1.25, DPR_MAX);   // start modestly; raised when the device keeps up
 renderer.setPixelRatio(dpr);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -975,12 +975,13 @@ canvas.addEventListener('dblclick',e=>{ const k=pick(e); if(k) focusOn(k); else 
 
 // ---------- controls wiring ----------
 const $=id=>document.getElementById(id);
-function setU(v){ state.uTarget=v; $('morph').value=v; $('g-onion').setAttribute('aria-pressed',v>.5); $('g-true').setAttribute('aria-pressed',v<=.5); }
+function setU(v){ if(v>.5 && state.cTarget>.5 && state.uTarget<=.5) toast('Round spheres with the Sun at the centre: the paths around the Sun are a drawing of the map, not orbits. Choose Flexing spheres to see true orbits.', 7000);
+  state.uTarget=v; $('morph').value=v; $('g-onion').setAttribute('aria-pressed',v>.5); $('g-true').setAttribute('aria-pressed',v<=.5); }
 $('g-onion').onclick=()=>setU(1); $('g-true').onclick=()=>setU(0);
 $('morph').oninput=e=>{ state.uTarget=+e.target.value; state.u=state.uTarget; $('g-onion').setAttribute('aria-pressed',state.u>.5); $('g-true').setAttribute('aria-pressed',state.u<=.5); };
 $('c-earth').onclick=()=>setCentre('Earth'); $('c-sun').onclick=()=>{ select('Sun'); setCentre('Sun'); };
 function setFrame(ef){ state.earthFixed=ef; $('f-earth').setAttribute('aria-pressed',ef); $('f-star').setAttribute('aria-pressed',!ef);
-  $('frame-note').textContent = ef ? 'The Muhit turns once per sidereal day (23 h 56 m) and carries every sphere with it.' : 'The stars are held still for viewing. The Earth is drawn turning instead; the sky positions are identical.'; }
+  $('frame-note').textContent = ef ? 'In this frame the whole sky, described as al-Muhit, turns once per sidereal day (23 h 56 m).' : 'The stars are held still for viewing. The Earth is drawn turning instead; the sky positions are identical.'; }
 $('f-earth').onclick=()=>setFrame(true); $('f-star').onclick=()=>setFrame(false);
 function toggleSky(){ state.skyView=!state.skyView; $('skyview').setAttribute('aria-pressed',state.skyView);
   $('skyview').textContent=state.skyView?'Back to the outside view':'Stand on Earth and look';
@@ -1195,6 +1196,7 @@ function openPane(p){ activePane = (p===activePane)? null : p;
   $('left').classList.toggle('open', !!activePane); }
 document.querySelectorAll('.rail [data-pane]').forEach(b=>b.onclick=()=>openPane(b.dataset.pane));
 $('card-x').onclick=()=>$('right').classList.add('min');
+$('scale-chip').onclick=()=>{ if(activePane!=='view') openPane('view'); setTimeout(()=>$('scale-group').scrollIntoView({block:'start',behavior:'smooth'}),60); };
 $('hud').onclick=()=>body.classList.toggle('hud-off');
 // --- warp effect
 function fxFor(ratioMin){ return ratioMin; }
@@ -1345,7 +1347,7 @@ const BEATS=[
  {layout:'side', key:'galaxies', kicker:'Within the eighth sphere', title:'Galaxies', body:'Our galaxy and nearly ten thousand others, each placed where its redshift puts it.', data:()=>[['Galaxies placed','9,879'],['Andromeda','2.5 million light-years'],['If Earth were a 1 cm marble','124 × the Earth–Sun distance']], n:8, d:172, m:()=>2.365e22},
  {layout:'side', key:'edge', kicker:'The limit of observation', title:'The edge of what can be seen', body:'The farthest distance from which light has had time to reach us. Nothing beyond it can be seen, measured or tested.', data:()=>[['Distance today','46.3 billion light-years'],['If Earth were a 1 cm marble','36 light-years']], n:8, d:245, m:()=>4.38e26},
  {layout:'side', key:'log', kicker:'How it all fits', title:'Twenty powers of ten', body:'Each ten-fold step outward takes the same space on this map. Directions are never changed; only depth is compressed. It is the one way Earth and the farthest galaxies fit on a single screen.', ill:()=>svgLog, d:262, m:()=>4.38e26},
- {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere, turning once a day and carrying all the others. It begins where observation ends, so no measurement can confirm it or rule it out.', ill:()=>svgMuhit, data:()=>[['Thickness drawn','10¹⁰⁰⁰ × the edge'],['Turns','Once a sidereal day']], n:9, d:VIEW_MUHIT, m:()=>1e30},
+ {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere. In this description the whole sky turns with it once a day. It begins where observation ends, so no measurement can confirm it or rule it out.', ill:()=>svgMuhit, data:()=>[['Thickness drawn','10¹⁰⁰⁰ × the edge'],['Turns','Once a sidereal day']], n:9, d:VIEW_MUHIT, m:()=>1e30},
  {layout:'title', key:'enter', html:`<h2 class="hero sm">Nine spheres. One sky.</h2><p class="statement">${STATEMENT}</p><div class="ctas"><button class="enter" id="intro-enter">Enter the model</button></div><div class="lnks"><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>`, d:30},
 ];
 BEATS.forEach(b=>{ if(b.body_){ b.body2=b.body_; b.data=()=>liveData(b.body2); if(!b.ill) b.ill=()=>svgSpheres(b.n); } else if(b.n && !b.ill) b.ill=()=>svgSpheres(b.n); });
@@ -1564,8 +1566,9 @@ function helioRead(obj, t){
 // --- conversions and formatting ---------------------------------------------------------------------------
 const toDate=(dir,t)=>{ const e=A.EquatorFromVector(A.RotateVector(A.Rotation_EQJ_EQD(t), new A.Vector(dir[0],dir[1],dir[2],t))); return {ra:e.ra, dec:e.dec}; };
 const toJ2000=(dir,t)=>{ const e=A.EquatorFromVector(new A.Vector(dir[0],dir[1],dir[2],t)); return {ra:e.ra, dec:e.dec}; };
-function horizonOf(dir, dist, t, obs){ let v=vsc(dir, isFinite(dist)? dist : 1e12); v=vsub(v, xyz(A.ObserverVector(t,obs,false)));
-  const d=toDate(vunit(v),t), h=A.Horizon(t,obs,d.ra,d.dec,'normal'); return {alt:h.altitude, az:h.azimuth}; }
+function topoOf(dir, dist, t, obs){ let v=vsc(dir, isFinite(dist)? dist : 1e12); v=vsub(v, xyz(A.ObserverVector(t,obs,false))); return toDate(vunit(v),t); }
+function horizonOf(dir, dist, t, obs, refr='normal'){ let v=vsc(dir, isFinite(dist)? dist : 1e12); v=vsub(v, xyz(A.ObserverVector(t,obs,false)));
+  const d=toDate(vunit(v),t), h=A.Horizon(t,obs,d.ra,d.dec,refr); return {alt:h.altitude, az:h.azimuth}; }
 const fRA=h=>{ h=((h%24)+24)%24; let H=Math.floor(h), mm=(h-H)*60, M=Math.floor(mm), S=(mm-M)*60; if(S>=59.9995){S=0;M++;} if(M>=60){M=0;H=(H+1)%24;}
   return `${String(H).padStart(2,'0')}h ${String(M).padStart(2,'0')}m ${S.toFixed(3).padStart(6,'0')}s`; };
 const fDeg=(d,dp=2)=>{ const sg=d<0?'−':'+'; d=Math.abs(d); let D=Math.floor(d), mm=(d-D)*60, M=Math.floor(mm), S=(mm-M)*60; if(S>=60-.5*10**-dp){S=0;M++;} if(M>=60){M=0;D++;}
@@ -1582,9 +1585,12 @@ function buildCalc(){ if(calcBuilt) return; calcBuilt=true; const sel=$('c-obj')
   CALC_OBJ.forEach((o,k)=>{ if(o.group!==grp){ grp=o.group; og=document.createElement('optgroup'); og.label=grp; sel.appendChild(og); }
     const op=document.createElement('option'); op.value=k; op.textContent=o.label; og.appendChild(op); });
   $('calc-form').addEventListener('submit',e=>{ e.preventDefault(); runCalc(); });
-  $('c-now').onclick=()=>{ $('c-time').value=A.MakeTime(state.ut).date.toISOString().slice(0,16); runCalc(); runEvents(); };
+  $('c-now').onclick=()=>{ setCalcTime(A.MakeTime(state.ut).date); runCalc(); runEvents(); };
   $('c-ev-go').onclick=runEvents; }
-function calcTime(){ const v=$('c-time').value; const d=new Date((v.length===16?v+':00':v)+'Z'); return A.MakeTime(isNaN(d)? new Date() : d); }
+function setCalcTime(date){ const iso=date.toISOString(); $('c-date').value=iso.slice(0,10); $('c-clock').value=iso.slice(11,16); }
+function calcTime(){ const d=$('c-date').value, c=($('c-clock').value||'00:00').trim(); const m=/^(\d{1,2}):(\d{2})$/.exec(c);
+  const dt=new Date(`${d}T${m?String(Math.min(23,+m[1])).padStart(2,'0')+':'+String(Math.min(59,+m[2])).padStart(2,'0'):'00:00'}:00Z`);
+  return A.MakeTime(isNaN(dt)? new Date() : dt); }
 function runCalc(){
   const obj=CALC_OBJ[+$('c-obj').value], t=calcTime(), geom=$('c-geom').value;
   const lat=+$('c-lat').value, lon=+$('c-lon').value, obs=new A.Observer(isFinite(lat)?lat:25.2048, isFinite(lon)?lon:55.2708, 0);
@@ -1595,13 +1601,16 @@ function runCalc(){
   const mH=horizonOf(M.dir,M.dist,t,obs), hH=horizonOf(H.dir,H.dist,t,obs);
   const rows=[];
   const dRA=(a,b,dec)=>{ let x=(a-b)*15*3600; if(x>648000) x-=1296000; if(x<-648000) x+=1296000; return x*Math.cos(dec*DEG); };
-  rows.push(['Right ascension (apparent, of date)', fRA(mD.ra), fRA(hD.ra), fSmall(dRA(mD.ra,hD.ra,hD.dec))]);
-  rows.push(['Declination (apparent, of date)', fDeg(mD.dec), fDeg(hD.dec), fSmall((mD.dec-hD.dec)*3600)]);
+  rows.push(['Right ascension, geocentric (apparent, of date)', fRA(mD.ra), fRA(hD.ra), fSmall(dRA(mD.ra,hD.ra,hD.dec))]);
+  rows.push(['Declination, geocentric (apparent, of date)', fDeg(mD.dec), fDeg(hD.dec), fSmall((mD.dec-hD.dec)*3600)]);
   rows.push(['Direction: total angle between the two answers', '', '', `<b>${fSmall(sepAs)}</b>`]);
   rows.push(['Distance from Earth', fDist(M.dist), fDist(H.dist), fRel(M.dist,H.dist)]);
   if(isFinite(H.dist)) rows.push(['Light-travel time', fmtLight(M.dist*AU_KM/299792.458), fmtLight(H.dist*AU_KM/299792.458), '']);
   if(obj.type==='star'){ rows.push(['Right ascension (J2000, astrometric)', fRA(mJ.ra), fRA(hJ.ra), fSmall(dRA(mJ.ra,hJ.ra,hJ.dec))]); rows.push(['Declination (J2000, astrometric)', fDeg(mJ.dec), fDeg(hJ.dec), fSmall((mJ.dec-hJ.dec)*3600)]); }
-  rows.push([`Altitude at ${obs.latitude.toFixed(2)}°, ${obs.longitude.toFixed(2)}°`, `${mH.alt.toFixed(4)}°`, `${hH.alt.toFixed(4)}°`, fSmall((mH.alt-hH.alt)*3600)]);
+  const mT=topoOf(M.dir,M.dist,t,obs), hT=topoOf(H.dir,H.dist,t,obs);
+  rows.push([`Right ascension, topocentric (as seen from ${obs.latitude.toFixed(2)}°, ${obs.longitude.toFixed(2)}°)`, fRA(mT.ra), fRA(hT.ra), fSmall(dRA(mT.ra,hT.ra,hT.dec))]);
+  rows.push(['Declination, topocentric', fDeg(mT.dec), fDeg(hT.dec), fSmall((mT.dec-hT.dec)*3600)]);
+  rows.push([`Altitude above the horizon (with refraction)`, `${mH.alt.toFixed(4)}°`, `${hH.alt.toFixed(4)}°`, fSmall((mH.alt-hH.alt)*3600)]);
   rows.push(['Azimuth (from north, through east)', `${mH.az.toFixed(4)}°`, `${hH.az.toFixed(4)}°`, fSmall(((mH.az-hH.az+540)%360-180)*3600)]);
   if(obj.key!=='Sun' && obj.type!=='star'){
     const MS=modelVector(SUNOBJ,t,geom), HS=helioRead(SUNOBJ,t);
@@ -1611,6 +1620,17 @@ function runCalc(){
     const hPh=angSec(vsub(H.E,H.P), vsc(H.P,-1))/3600;
     rows.push(['Lit fraction of the disc', `${((1+Math.cos(mPh*DEG))/2*100).toFixed(4)} %`, `${((1+Math.cos(hPh*DEG))/2*100).toFixed(4)} %`, `${Math.abs(mPh-hPh).toFixed(5)}° in phase angle`]); }
   rows.push(['Constellation', A.Constellation(mJ.ra,mJ.dec).name, A.Constellation(hJ.ra,hJ.dec).name, '']);
+  // rise, culmination and set: found by the ephemeris search, then checked as altitudes in this model
+  const rsBody = obj.type==='major' ? obj.key : obj.type==='moon' ? 'Jupiter' : obj.type==='star' ? 'Star1' : null;
+  if(rsBody){ if(rsBody==='Star1'){ const st=SKY.s[obj.idx]; A.DefineStar(A.Body.Star1, st[0]/15, st[1], st[4]>0? st[4]*LY_PER_PC : 1e6); }
+    const altAt=(tt,refr)=>{ const m=modelVector(obj,tt,geom); return horizonOf(m.dir,m.dist,tt,obs,refr).alt; };
+    const REF=34/60;   // the standard refraction at the horizon used to define rise and set
+    const sd = obj.type==='major' ? Math.asin(Math.min(1,obj.key==='Sun'?695700/(H.dist*AU_KM):obj.key==='Moon'?1737.4/(H.dist*AU_KM):0))/DEG : 0;
+    const ev=[['Next rise', A.SearchRiseSet(rsBody,obs,+1,t,1.5)], ['Next culmination (highest point)', A.SearchHourAngle(rsBody,obs,0,t,+1)], ['Next set', A.SearchRiseSet(rsBody,obs,-1,t,1.5)]];
+    for(const [nm,r] of ev){ const tt = r ? (r.time||r) : null;
+      if(!tt){ rows.push([nm, 'does not happen in the next day and a half', '', '']); continue; }
+      const culm=nm.startsWith('Next culm'), a=altAt(tt, culm?'normal':''), want=-(REF+sd);
+      rows.push([nm+(obj.type==='moon'?' (with Jupiter)':''), `${fUT(tt)}<br><span class="sm">${culm?`altitude in this model ${a.toFixed(4)}°`:`true altitude of the centre in this model ${a.toFixed(4)}°; the definition of ${nm.endsWith('rise')?'rising':'setting'} is ${want.toFixed(4)}° (34′ of refraction${sd?' plus the disc radius':''})`}</span>`, culm? `${fUT(tt)}<br><span class="sm">ephemeris altitude ${r.hor.altitude.toFixed(4)}°</span>` : fUT(tt), culm? fSmall((a-r.hor.altitude)*3600) : fSmall((a-want)*3600)]); } }
   const ms=(performance.now()-t0).toFixed(0);
   const links=[];
   const t1=t.date.toISOString().slice(0,16).replace('T',' '), t2=new Date(t.date.getTime()+60000).toISOString().slice(0,16).replace('T',' ');
@@ -1659,7 +1679,7 @@ function runEvents(){ const box=$('c-events'); box.innerHTML='<p class="note">Se
       state.ut=e.t.ut-(e.rate&&e.rate<.01? 0.03 : 0.25); select(e.body); focusOn(e.body); setRate(e.rate||.0416667); state.playing=true; $('t-play').textContent='Pause'; toast(`${e.name} · ${fUT(e.t)}`,5000); });
   }, 30); }
 function openCalc(){ buildCalc(); $('calc').hidden=false; $('c-geom').value = state.uTarget>.5 ? 'round' : 'flex';
-  if(!$('c-time').value) $('c-time').value=A.MakeTime(state.ut).date.toISOString().slice(0,16);
+  if(!$('c-date').value) setCalcTime(A.MakeTime(state.ut).date);
   runCalc(); runEvents(); $('calc').querySelector('.doc').focus(); }
 function closeCalc(){ $('calc').hidden=true; }
 $('open-calc').onclick=openCalc; $('calc-x').onclick=closeCalc;
