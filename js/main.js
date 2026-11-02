@@ -130,7 +130,7 @@ function dispEarth(s, out){
 // ---------- renderer ----------
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true});
-const DPR_MAX=Math.min(devicePixelRatio, 2); let dpr=DPR_MAX;
+const DPR_MAX=Math.min(devicePixelRatio, 1.5); let dpr=Math.min(1.25, DPR_MAX);   // start modestly; raised when the device keeps up
 renderer.setPixelRatio(dpr);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 const scene = new THREE.Scene();
@@ -148,7 +148,7 @@ controls.enablePan = true; controls.screenSpacePanning = true;
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(256,256), .55, .45, .9);
-{ const set=bloom.setSize.bind(bloom); bloom.setSize=(w,h)=>set(Math.max(1,w/2),Math.max(1,h/2)); }
+{ const set=bloom.setSize.bind(bloom); bloom.setSize=(w,h)=>set(Math.max(1,w/3),Math.max(1,h/3)); }
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
@@ -657,7 +657,9 @@ function sbApparent(i, jd, E, V, out){ const o=SB[i], o3=[0,0,0]; orbitPos(o,jd,
   else { const re=Math.hypot(E[0],E[1],E[2]), q=0.5*GK*GK/(re*re*re)*tau*tau; ex=E[0]-V[0]*tau-q*E[0]; ey=E[1]-V[1]*tau-q*E[1]; ez=E[2]-V[2]*tau-q*E[2]; }
   const px=o3[0]-ex, py=o3[1]-ey, pz=o3[2]-ez, lp=Math.hypot(px,py,pz);
   out[0]=px/lp*L; out[1]=py/lp*L; out[2]=pz/lp*L; return out; }
-function updateSmallBodies(t){
+let lastSbKey='';
+function updateSmallBodies(t, force){
+  const key=t.ut+'|'+state.u.toFixed(4)+'|'+state.c.toFixed(4); if(!force && key===lastSbKey) return; lastSbKey=key;
   const jd=t.ut+2451545.0, es=A.HelioState('Earth',t); EH=toS(es); EV=toS({x:es.vx,y:es.vy,z:es.vz});
   const ap=[0,0,0];
   const o3=[0,0,0], ta=tailGeo.attributes.position.array, tc=tailGeo.attributes.color.array; let tk=0;
@@ -708,7 +710,9 @@ function geoApparent(key, t){
   const L=Math.hypot(ast.x,ast.y,ast.z), a=toS(app), la=Math.hypot(...a), u=[a[0]/la,a[1]/la,a[2]/la];
   return {p:[u[0]*L,u[1]*L,u[2]*L], d:L, u};
 }
+let lastCompUt=null;
 function compute(t){
+  if(t.ut===lastCompUt) return; lastCompUt=t.ut;   // a pure function of time: nothing to redo when time has not moved
   for(const b of [...BODIES, ...OUTER]){ pos[b.key]=geoApparent(b.key, t); }
   sunNow = pos.Sun.p; qsNow = pos.Sun.u.map(x=>x*R_SUN);
   anchors = [{p:[0,0,0], d:[0,0,0], s2:0.004**2}];
@@ -1040,15 +1044,15 @@ addEventListener('resize',resize); resize();
 
 // ---------- loop ----------
 const precM=new THREE.Matrix4(), nm3=new THREE.Matrix3(), eInv=new THREE.Quaternion();
-let last=performance.now(), readoutDue=0, frame=0; const perf={acc:0,n:0};
+let last=performance.now(), readoutDue=0, frame=0, lastGeoKey=''; const perf={acc:0,n:0};
 const pad=n=>String(n).padStart(2,'0');
 const S=[[1,0,0],[0,0,1],[0,-1,0]], Si=[[1,0,0],[0,0,-1],[0,1,0]];
 const mul=(a,b)=>a.map(r=>b[0].map((_,j)=>r[0]*b[0][j]+r[1]*b[1][j]+r[2]*b[2][j]));
 function tick(now){
   const dt=Math.min(.1,(now-last)/1000); last=now; frame++; state.time+=dt;
   // keep the frame rate smooth: lower the resolution on slow devices, raise it again when there is headroom
-  perf.acc+=dt; perf.n++; if(perf.n>=90){ const ms=perf.acc/perf.n*1000; perf.acc=0; perf.n=0;
-    if(ms>24 && dpr>1){ dpr=Math.max(1,dpr-.25); resize(); } else if(ms<13 && dpr<DPR_MAX){ dpr=Math.min(DPR_MAX,dpr+.25); resize(); } }
+  perf.acc+=dt; perf.n++; if(perf.n>=45){ const ms=perf.acc/perf.n*1000; perf.acc=0; perf.n=0;
+    if(ms>21 && dpr>.75){ dpr=Math.max(.75,dpr-.25); resize(); } else if(ms<12 && dpr<DPR_MAX){ dpr=Math.min(DPR_MAX,dpr+.25); resize(); } }
   if(state.playing) state.ut += state.rate*state.dir*dt;
   state.ut=Math.max(-1095000, Math.min(1095000, state.ut));
   const ease=k=>Math.min(1,dt*k);
@@ -1057,6 +1061,7 @@ function tick(now){
   $('morph-o').textContent = state.u>.98?'spheres':state.u<.02?'measured':`${Math.round(state.u*100)} % spheres`;
   const t=A.MakeTime(state.ut);
   compute(t);
+  const geoKey=state.ut+'|'+state.u.toFixed(4)+'|'+state.c.toFixed(4), geoChanged=geoKey!==lastGeoKey; lastGeoKey=geoKey;
 
   const R=A.Rotation_EQJ_EQD(t).rot;
   const M=mul(mul(S,[[R[0][0],R[1][0],R[2][0]],[R[0][1],R[1][1],R[2][1]],[R[0][2],R[1][2],R[2][2]]]),Si);
@@ -1077,7 +1082,7 @@ function tick(now){
     b.mesh.material.uniforms.uL.value.copy(W.applyQuaternion(tmpQ.copy(b.mesh.quaternion).invert()));
     b.mesh.material.uniforms.uT.value=state.time;
     b.trailLine.visible=state.showTrails;
-    if(state.showTrails && (frame%2===0 || state.rate<0.3)){ updateTrail(b.trail, b.key, b.span, state.ut);
+    if(state.showTrails && geoChanged && (frame%2===0 || state.rate<0.3)){ updateTrail(b.trail, b.key, b.span, state.ut);
       drawTrail(b.trailLine, b.trail.pts, b.col, (q,o)=>dispBody(b,q.p,q.s,o)); }
   }
   sunGlow.position.copy(BMAP.Sun.mesh.position);
@@ -1095,7 +1100,7 @@ function tick(now){
     flexShells.forEach(m=>{ m.visible=on; m.userData.cap.visible=on; m.material.uniforms.uA.value=.7*fa; m.material.uniforms.uHi.value = m.userData.key===state.sel?1:0; });
     if(on && (frame%3===0 || state.rate<.05)) updateFlex(); }
   if(moonGroups[0].visible) updateMoons(t);
-  if(smallBodies.visible && (frame%2===0)){ updateSmallBodies(t); if(frame%6===0) updateCometOrbits(); }
+  if(smallBodies.visible && (frame%2===0)){ updateSmallBodies(t); if(frame%6===0 && geoChanged) updateCometOrbits(); }
   W.set(sunNow[0],sunNow[1],sunNow[2]).applyMatrix3(nm3.setFromMatrix4(prec.matrixWorld)).normalize();
   earthMat.uniforms.uLv.value.copy(W).transformDirection(camera.matrixWorldInverse); earthMat.uniforms.uT.value=state.time;
   earthMat.uniforms.uL.value.copy(W.applyQuaternion(eInv.copy(earth.quaternion).invert()));
@@ -1116,7 +1121,7 @@ function tick(now){
     for(let i=0;i<NP;i++){ const s=i/(NP-1); ch.setXYZ(i,eD[0]+(end[0]-eD[0])*s,eD[1]+(end[1]-eD[1])*s,eD[2]+(end[2]-eD[2])*s); } ch.needsUpdate=true; chordLine.computeLineDistances();
     if(state.mech==='medium'){ const sp=[-.35,0,.35]; dispLines.forEach((l,k)=>setPath(l,[0,0,0],P,eD,end,sp[k]*Math.min(1,pos[state.sel].d))); }
   }
-  if(fabric.visible && frame%2===0) drawFabric();
+  if(fabric.visible && geoChanged && frame%2===0) drawFabric();
   fabric.material.opacity=.2*(1-.6*state.c);
 
   // stars: yearly aberration and parallax (magnified)
@@ -1170,7 +1175,7 @@ function tick(now){
   const d=t.date; $('clock-d').textContent=`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
   $('clock-s').textContent=`${$('t-rate').selectedOptions[0].text}${state.dir<0?', reversed':''}${state.playing?'':', paused'}`;
   if(frame%6===0) uiFrame();
-  if(now>readoutDue){ readouts(t); readoutDue=now+250; }
+  if(now>readoutDue && state.intro===null && (!$('right').classList.contains('min') || activePane==='light')){ readouts(t); readoutDue=now+250; }
   requestAnimationFrame(tick);
 }
 
@@ -1220,7 +1225,7 @@ function uiFrame(){
 // --- journey
 const STOPS=[
   {t:'Outside everything', b:'This is al-Falak al-Muhit seen from beyond its outer face. Watch the scale along the bottom: its thickness spans a thousand powers of ten past the edge of the observable universe, the bright speck at its heart.', go:()=>{ setCentre('Earth'); setU(1); warpTo(VIEW_MUHIT); }},
-  {t:'The edge of what we can see', b:'46.3 billion light-years out lies the particle horizon. Just inside it glows the cosmic microwave background, light released 380,000 years after the Big Bang. Beyond it, nothing can ever be observed.', go:()=>warpTo(235)},
+  {t:'The edge of what we can see', b:'46.3 billion light-years out lies the particle horizon, the farthest distance from which light has had time to reach us. Just inside it glows the cosmic microwave background. Beyond it, nothing can ever be observed.', go:()=>warpTo(235)},
   {t:'Ten thousand real galaxies', b:'Every point is a catalogued galaxy at its measured distance and true direction. Click any one to see how long ago its light set out.', go:()=>warpTo(160)},
   {t:'Our galaxy and its stars', b:'The Milky Way, then 8,920 naked-eye stars placed by parallax. The constellation figures stretch into depth: their stars only look close together from Earth.', go:()=>warpTo(98)},
   {t:'Jupiter and its moons', b:'Io, Europa, Ganymede and Callisto sit exactly where they are tonight. Beyond Mars, the asteroid belt and Jupiter’s Trojans follow their orbits.', go:()=>{ select('Jupiter'); focusOn('Jupiter'); }},
@@ -1283,7 +1288,7 @@ $('snd').onclick=()=>{ const on=$('snd').getAttribute('aria-pressed')!=='true'; 
 applyHaq(haqOn);
 body.classList.add('splash');
 // ---- intro: a scroll-driven tour. Earth first, then each sphere in turn, then the scale of everything,
-// then al-Muhit, then the way in. One beat per screen-and-a-bit of scrolling, so every line can be read.
+// then al-Muhit, then the way in. Text sits in a column on one side; the model is framed on the other.
 const dotSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex('rgba(220,235,255,1)','rgba(120,170,255,.55)','rgba(80,120,255,0)'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
 scene.add(dotSprite);
 state.intro=0; state.introP=0; state.playing=false; $('t-play').textContent='Play';
@@ -1294,59 +1299,105 @@ const AU_M=1.495978707e11, MARBLE_KM=12742;               // Earth's diameter pi
 const fmtMarble = km => { const cm=km/MARBLE_KM; if(cm<100) return `${cm<10?cm.toFixed(1):Math.round(cm)} cm`;
   const m=cm/100; if(m<1000) return `${m<10?m.toFixed(1):Math.round(m)} m`; const k=m/1000; return `${k<10?k.toFixed(1):Math.round(k).toLocaleString()} km`; };
 const fmtLight = s => s<60? `${s.toFixed(1)} seconds` : s<3600? `${(s/60).toFixed(1)} minutes` : `${(s/3600).toFixed(2)} hours`;
-const liveChip = key => { const au=pos[key].d, km=au*AU_KM;
-  const dist = au<.01 ? `${Math.round(km).toLocaleString()} km` : `${au.toFixed(2)} AU, ${Math.round(km/1e6).toLocaleString()} million km,`;
-  return `${dist} from Earth today. Light takes ${fmtLight(km/299792.458)}.<br>On the marble scale: ${fmtMarble(km)} away.`; };
+const liveData = key => { const au=pos[key].d, km=au*AU_KM;
+  return [['Distance today', au<.01 ? `${Math.round(km).toLocaleString()} km` : `${au.toFixed(2)} AU`],
+          ['Light takes', fmtLight(km/299792.458)], ['If Earth were a 1 cm marble', fmtMarble(km)]]; };
+// --- small illustrations ---------------------------------------------------------------------------------
+// the nine spheres as nested arcs around Earth, the current one lit
+function svgSpheres(cur){ const R=[22,34,46,58,70,82,94,112,136]; let s='';
+  R.forEach((r,k)=>{ const n=k+1, on=n===cur, past=n<cur, w = n===9 ? (on?9:6) : (on?2.2:1);
+    const col = on?'#9ec4ff':past?'rgba(220,226,255,.55)':'rgba(220,226,255,.14)';
+    s+=`<path d="M8 ${150-r} A${r} ${r} 0 0 1 8 ${150+r}" fill="none" stroke="${col}" stroke-width="${w}"/>`;
+    s+=`<text x="${8+r}" y="${150+4}" dx="${n===9?8:4}" font-size="9" fill="${on?'#9ec4ff':'rgba(220,226,255,.4)'}">${n}</text>`; });
+  return `<svg class="ill" viewBox="0 0 170 300" role="img" aria-label="The nine spheres around Earth, sphere ${cur} highlighted"><circle cx="8" cy="150" r="6" fill="#6fa8ff"/>${s}</svg>`; }
+const svgMarble = `<svg class="ill wide" viewBox="0 0 300 70" role="img" aria-label="Earth as a one-centimetre marble">
+  <circle cx="30" cy="35" r="14" fill="#2c5aa0"/><circle cx="26" cy="31" r="5" fill="rgba(255,255,255,.25)"/>
+  <path d="M16 60 H44" stroke="rgba(220,226,255,.6)"/><path d="M16 56 V64 M44 56 V64" stroke="rgba(220,226,255,.6)"/>
+  <text x="30" y="70" font-size="9" fill="rgba(220,226,255,.7)" text-anchor="middle">1 cm</text>
+  <text x="62" y="31" font-size="11" fill="rgba(240,242,255,.9)">= 12,742 km</text><text x="62" y="47" font-size="9" fill="rgba(220,226,255,.55)">Every distance that follows uses this scale</text></svg>`;
+const svgLog = `<svg class="ill wide" viewBox="0 0 320 120" role="img" aria-label="The same distances on a linear and a logarithmic scale">
+  <text x="0" y="12" font-size="9" fill="rgba(220,226,255,.6)">Linear: everything but the edge is crushed into one point</text>
+  <path d="M0 28 H320" stroke="rgba(220,226,255,.35)"/><circle cx="1.5" cy="28" r="3" fill="#9ec4ff"/><circle cx="318" cy="28" r="3" fill="rgba(220,226,255,.8)"/>
+  <text x="318" y="44" font-size="8" fill="rgba(220,226,255,.5)" text-anchor="end">edge</text><text x="2" y="44" font-size="8" fill="rgba(220,226,255,.5)">Earth, Moon, Sun, stars, galaxies</text>
+  <text x="0" y="74" font-size="9" fill="rgba(220,226,255,.6)">Logarithmic: one equal step for each power of ten</text>
+  <path d="M0 90 H320" stroke="rgba(220,226,255,.35)"/>
+  ${[['Earth',6.8],['Moon',8.6],['Sun',11.2],['Saturn',12.2],['Star',16.6],['Galaxy',22.4],['Edge',26.6]].map(([n,L],k)=>{ const x=(L-6.8)/19.8*316+2;
+    return `<circle cx="${x}" cy="90" r="3" fill="${k===0?'#6fa8ff':'rgba(220,226,255,.85)'}"/><text x="${x}" y="${k%2?84:106}" font-size="8" fill="rgba(220,226,255,.6)" text-anchor="middle">${n}</text>`; }).join('')}</svg>`;
+const svgMuhit = `<svg class="ill wide" viewBox="0 0 320 90" role="img" aria-label="The observable universe as a speck inside the thickness of al-Muhit">
+  <defs><linearGradient id="mh" x1="0" x2="1"><stop offset="0" stop-color="rgba(158,196,255,.55)"/><stop offset="1" stop-color="rgba(158,196,255,0)"/></linearGradient></defs>
+  <rect x="34" y="30" width="286" height="18" fill="url(#mh)"/><circle cx="20" cy="39" r="4" fill="rgba(240,242,255,.9)"/>
+  <text x="20" y="64" font-size="8" fill="rgba(220,226,255,.6)" text-anchor="middle">all we can see</text>
+  <text x="40" y="22" font-size="9" fill="rgba(220,226,255,.75)">al-Muhit: from the edge outward, a thousand powers of ten</text>
+  <text x="316" y="64" font-size="8" fill="rgba(220,226,255,.45)" text-anchor="end">10¹⁰⁰⁰ × farther</text></svg>`;
+const STATEMENT='No law of physics or mathematics is broken here: it is the same universe and the same light, described from a frame in which Earth is at rest.';
 const BEATS=[
- {pos:'mid', html:'<h1>The universe, through a different lens</h1>', d:34},
- {pos:'mid', html:'<p>Somewhere in this darkness is a small blue point of light.</p>', d:34},
- {pos:'top', key:'earth', html:'<p>Earth. In this model it holds still, at the centre of everything.</p>', chip:()=>'12,742 km across. Picture it as a marble one centimetre wide; we will keep that scale all the way out.', d:2.1, m:()=>6.371e6},
- {pos:'top', body:'Moon', html:'<p>The first sphere carries the Moon.</p>', chip:()=>liveChip('Moon'), d:6.6},
- {pos:'top', body:'Mercury', html:'<p>The second carries Mercury, the swiftest of the planets.</p>', chip:()=>liveChip('Mercury'), d:10.6},
- {pos:'top', body:'Venus', html:'<p>The third carries Venus, which waxes and wanes like the Moon.</p>', chip:()=>liveChip('Venus'), d:14.6},
- {pos:'top', body:'Sun', html:'<p>The fourth sphere carries the Sun, in the middle of the seven.</p>', chip:()=>liveChip('Sun'), d:19},
- {pos:'top', body:'Mars', html:'<p>The fifth carries Mars.</p>', chip:()=>liveChip('Mars'), d:23.5},
- {pos:'top', body:'Jupiter', html:'<p>The sixth carries Jupiter and its four great moons. Between Mars and Jupiter drift thousands of asteroids, and comets cross on their measured orbits.</p>', chip:()=>liveChip('Jupiter'), d:28},
- {pos:'top', body:'Saturn', html:'<p>The seventh carries Saturn, the last of the planets.</p>', chip:()=>liveChip('Saturn'), d:32.5},
- {pos:'top', key:'stars', html:'<p>The eighth sphere holds the fixed stars and the twelve signs. Every star sits at its measured distance, so the figures of the zodiac stretch deep into space.</p>', chip:()=>'Nearest star, Proxima Centauri: 4.24 light-years.<br>On the marble scale: 31,500 km, most of the way around the real Earth.', d:105, m:()=>4.0175e16},
- {pos:'top', key:'galaxies', html:'<p>Beyond the stars lie our galaxy and ten thousand others, each placed where its redshift puts it.</p>', chip:()=>'Andromeda: 2.5 million light-years.<br>On the marble scale: 124 times the distance from the Earth to the Sun.', d:172, m:()=>2.365e22},
- {pos:'top', key:'edge', html:'<p>Then the edge of everything that can be seen. Light from here set out 13.8 billion years ago, soon after the Big Bang.</p>', chip:()=>'46.3 billion light-years away today.<br>On the marble scale: 36 light-years.', d:245, m:()=>4.38e26},
- {pos:'top', key:'log', html:'<p>All of this spans twenty powers of ten. The map is logarithmic: each ten-fold step outward takes the same space, which is the only way Earth and the farthest galaxies fit on one screen.</p>', chip:()=>'From 10<sup>7</sup> metres to 10<sup>27</sup> metres, one equal step for each power of ten.', d:262, m:()=>4.38e26},
- {pos:'top', key:'muhit', html:'<p>Around all of it turns the ninth sphere, al-Falak al-Muhit. It begins where observation ends. Here its outer face lies a thousand powers of ten beyond the edge, drawn on the same scale.</p>', chip:()=>'10<sup>1000</sup> × 46.3 billion light-years. Nothing beyond the edge can be observed, so no measurement confirms it or rules it out.', d:VIEW_MUHIT, m:()=>1e30},
- {pos:'mid', key:'enter', html:'<p>Nine spheres. One sky. Every measurement unchanged.</p><div class="ctas"><button class="enter" id="intro-enter">Enter the model</button></div><div class="lnks"><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>', d:30},
+ {layout:'title', html:`<h1 class="hero">The universe, through a different lens</h1><p class="lede">A still Earth at the centre of nine nested spheres, with every planet, star and galaxy exactly where telescopes measure it.</p><p class="statement">${STATEMENT}</p>`, d:34},
+ {layout:'center', html:'<p class="lede big">Somewhere in this darkness is a small blue point of light.</p>', d:34},
+ {layout:'side', key:'earth', kicker:'The centre', title:'Earth', body:'In this model it holds still. Every distance is measured from here, and every direction is the direction a telescope on Earth would point.', data:()=>[['Diameter','12,742 km'],['State','At rest']], ill:()=>svgMarble, d:2.1, m:()=>6.371e6},
+ {layout:'side', body_:'Moon', body:'The nearest sphere, turning once a month.', kicker:'Sphere 1 · فلك القمر', title:'The Moon', n:1, d:6.6},
+ {layout:'side', body_:'Mercury', body:'The swiftest planet, never far from the Sun.', kicker:'Sphere 2 · فلك عطارد', title:'Mercury', n:2, d:10.6},
+ {layout:'side', body_:'Venus', body:'The brightest planet. It shows phases like the Moon, and the model reproduces every one of them.', kicker:'Sphere 3 · فلك الزهرة', title:'Venus', n:3, d:14.6},
+ {layout:'side', body_:'Sun', body:'The middle of the seven. Its sphere turns once a year and sets the seasons.', kicker:'Sphere 4 · فلك الشمس', title:'The Sun', n:4, d:19},
+ {layout:'side', body_:'Mars', body:'Every two years or so it seems to loop backward across the stars, exactly as the model shows it from Earth.', kicker:'Sphere 5 · فلك المريخ', title:'Mars', n:5, d:23.5},
+ {layout:'side', body_:'Jupiter', body:'With its four great moons, placed where they are tonight. Between Mars and Jupiter drift thousands of asteroids, and comets cross on their measured orbits.', kicker:'Sphere 6 · فلك المشتري', title:'Jupiter', n:6, d:28},
+ {layout:'side', body_:'Saturn', body:'The last of the planets, its rings tilted as telescopes see them today.', kicker:'Sphere 7 · فلك زحل', title:'Saturn', n:7, d:32.5},
+ {layout:'side', key:'stars', kicker:'Sphere 8 · فلك البروج', title:'The fixed stars', body:'Every star sits at its measured distance. The twelve zodiac figures stretch deep into space; only from Earth do their stars line up.', data:()=>[['Stars placed','8,920'],['Nearest star','4.24 light-years'],['If Earth were a 1 cm marble','31,500 km']], n:8, d:105, m:()=>4.0175e16},
+ {layout:'side', key:'galaxies', kicker:'Within the eighth sphere', title:'Galaxies', body:'Our galaxy and nearly ten thousand others, each placed where its redshift puts it.', data:()=>[['Galaxies placed','9,879'],['Andromeda','2.5 million light-years'],['If Earth were a 1 cm marble','124 × the Earth–Sun distance']], n:8, d:172, m:()=>2.365e22},
+ {layout:'side', key:'edge', kicker:'The limit of observation', title:'The edge of what can be seen', body:'The farthest distance from which light has had time to reach us. Nothing beyond it can be seen, measured or tested.', data:()=>[['Distance today','46.3 billion light-years'],['If Earth were a 1 cm marble','36 light-years']], n:8, d:245, m:()=>4.38e26},
+ {layout:'side', key:'log', kicker:'How it all fits', title:'Twenty powers of ten', body:'Each ten-fold step outward takes the same space on this map. Directions are never changed; only depth is compressed. It is the one way Earth and the farthest galaxies fit on a single screen.', ill:()=>svgLog, d:262, m:()=>4.38e26},
+ {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere, turning once a day and carrying all the others. It begins where observation ends, so no measurement can confirm it or rule it out.', ill:()=>svgMuhit, data:()=>[['Thickness drawn','10¹⁰⁰⁰ × the edge'],['Turns','Once a sidereal day']], n:9, d:VIEW_MUHIT, m:()=>1e30},
+ {layout:'title', key:'enter', html:`<h2 class="hero sm">Nine spheres. One sky.</h2><p class="statement">${STATEMENT}</p><div class="ctas"><button class="enter" id="intro-enter">Enter the model</button></div><div class="lnks"><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>`, d:30},
 ];
+BEATS.forEach(b=>{ if(b.body_){ b.body2=b.body_; b.data=()=>liveData(b.body2); if(!b.ill) b.ill=()=>svgSpheres(b.n); } else if(b.n && !b.ill) b.ill=()=>svgSpheres(b.n); });
 const NB=BEATS.length;
-introEl.querySelector('.track').style.height=(NB*118)+'vh';
-const beatEls=BEATS.map(b=>{ const el=document.createElement('div'); el.className='beat '+b.pos;
-  el.innerHTML=`<div class="btxt">${b.html}</div>${b.chip?'<div class="chip"></div>':''}`; stageEl.appendChild(el); return el; });
-const bIndex = key => BEATS.findIndex(b=>b.body===key || b.key===key);
+introEl.querySelector('.track').style.height=(NB*110)+'vh';
+const beatEls=BEATS.map(b=>{ const el=document.createElement('section'); el.className='beat '+b.layout;
+  el.innerHTML = b.layout==='side'
+    ? `<div class="col"><p class="kicker">${b.kicker}</p><h2 class="ttl">${b.title}</h2><p class="body">${b.body}</p><dl class="data"></dl><div class="illw"></div></div>`
+    : b.html;
+  stageEl.appendChild(el); return el; });
+const bIndex = key => BEATS.findIndex(b=>b.body2===key || b.key===key);
 // the scale ruler: powers of ten from Earth's radius to the edge of the observable universe, then al-Muhit
 const RL_MIN=6.5, RL_MAX=27, RL_W=.86;
 const lx = L => L<=RL_MAX ? Math.max(0,(L-RL_MIN)/(RL_MAX-RL_MIN))*RL_W : RL_W+.04+Math.min(1,(L-RL_MAX)/3)*(1-RL_W-.06);
 const irEl=document.createElement('div'); irEl.className='iruler'; irEl.setAttribute('aria-hidden','true');
 irEl.innerHTML='<div class="ir-read"><b id="ir-num"></b><span id="ir-txt"></span></div><div class="ir-track" id="ir-track"><div class="ir-axis"></div><div class="ir-mseg"></div><div class="ir-brk">//</div><div class="ir-mk" id="ir-mk"></div></div>';
 introEl.appendChild(irEl);
+const scrimEl=document.createElement('div'); scrimEl.className='scrim'; introEl.appendChild(scrimEl);
+const scrimC=document.createElement('div'); scrimC.className='scrim centre'; introEl.appendChild(scrimC);
 const irTrack=irEl.querySelector('#ir-track'), irLms=[];
 { const add=(cls,x,html)=>{ const e=document.createElement('div'); e.className=cls; e.style.left=(x*100)+'%'; if(html) e.innerHTML=html; irTrack.appendChild(e); return e; };
   for(let p=7;p<=27;p++){ add('ir-tk'+(p%5===0?' major':''),lx(p)); if(p%5===0) add('ir-tl',lx(p),`10<sup>${p}</sup> m`); }
   [['Earth',6.371e6],['Moon',3.844e8],['Sun',1.496e11],['Saturn',1.43e12],['Proxima',4.0175e16],['Galactic centre',2.5e20],['Andromeda',2.365e22],['Edge',4.38e26]]
-    .forEach(([nm,m],k)=>{ const L=Math.log10(m); const e=add('ir-lm'+(k%2?' hi':''),lx(L),nm); irLms.push({e,L}); });
-  irLms.push({e:add('ir-lm muhit',lx(30),'al-Muhit'),L:29.5}); }
-const beatL = k => { const b=BEATS[k]; if(b.body) return Math.log10(pos[b.body].d*AU_M); if(b.m) return Math.log10(b.m()); return null; };
+    .forEach(([nm,m],k)=>{ const L=Math.log10(m); const e=add('ir-lm'+(k%2?' hi':''),lx(L),nm); irLms.push({e,L,on:false}); });
+  irLms.push({e:add('ir-lm muhit',lx(30),'al-Muhit'),L:29.5,on:false}); }
+const beatL = k => { const b=BEATS[k]; if(b.body2) return Math.log10(pos[b.body2].d*AU_M); if(b.m) return Math.log10(b.m()); return null; };
 const humanM = m => m<1e9 ? `${Math.round(m/1000).toLocaleString()} km` : m<1e14 ? `${(m/AU_M).toFixed(m<1.5e12?2:1)} AU` : fmtLy(m/9.4607e15);
-let introDir=null, chipsDone=false;
+let introDir=null, filled=false, activeBeat=-1, lastL=null, lastOp=-1, viewShift=0, lastShift=null;
 introEl.addEventListener('scroll',()=>{ const max=introEl.scrollHeight-introEl.clientHeight; state.introP=max>0? introEl.scrollTop/max : 0; },{passive:true});
+function fillBeats(){ BEATS.forEach((b,k)=>{ if(b.layout!=='side') return; const el=beatEls[k];
+  if(b.data) el.querySelector('.data').innerHTML=b.data().map(([t,v])=>`<div><dt>${t}</dt><dd>${v}</dd></div>`).join('');
+  if(b.ill) el.querySelector('.illw').innerHTML=b.ill(); }); filled=true; }
+const sideLayout = () => innerWidth>=900 && innerWidth/innerHeight>1.05;
 function introCamera(dt){
-  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*4);
-  if(!chipsDone){ BEATS.forEach((b,k)=>{ if(b.chip) beatEls[k].querySelector('.chip').innerHTML=b.chip(); }); chipsDone=true; }
+  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*7);
+  if(!filled) fillBeats();
   if(!introDir){ // look at Earth's sunlit side, a little from above
     const sw=new THREE.Vector3(...sunNow).applyMatrix3(new THREE.Matrix3().setFromMatrix4(prec.matrixWorld)).normalize();
     introDir=sw.clone().multiplyScalar(.75).add(new THREE.Vector3(0,.35,0)).add(new THREE.Vector3().crossVectors(sw,new THREE.Vector3(0,1,0)).normalize().multiplyScalar(.55)).normalize(); }
   const x=p*NB, i=Math.min(NB-1,Math.floor(x)), s=Math.min(1,x-i);
-  // text: each beat fades in, holds for most of its scroll, then fades out
-  beatEls.forEach((el,k)=>{ const lx0=x-k; let v = k===0 ? 1-smooth(.78,.97,lx0) : k===NB-1 ? smooth(.05,.22,lx0) : Math.min(smooth(.05,.22,lx0), 1-smooth(.78,.97,lx0));
-    v=Math.max(0,v); el.style.opacity=v; el.style.visibility=v<.01?'hidden':''; el.style.transform=`translateY(${(1-v)*12}px)`; });
-  $('intro-hint').style.opacity = p<.005 ? 1 : Math.max(0,1-(p-.005)*60);
+  // text: one beat is on at a time; CSS handles the staggered entrance and the exit
+  const on = (i===0 && s<.9) || (i===NB-1 && s>.05) || (s>.05 && s<.92) ? i : -1;
+  if(on!==activeBeat){ beatEls.forEach((el,k)=>el.classList.toggle('on',k===on)); activeBeat=on; }
+  $('intro-hint').style.opacity = p<.004 ? 1 : 0;
+  // frame the model: on wide screens it moves to the right while text occupies the left
+  const side = BEATS[i].layout==='side' ? 1 : 0, wide=sideLayout();
+  viewShift += (side-viewShift)*Math.min(1,dt*4);
+  const sh=Math.round(viewShift*1000)/1000;
+  if(sh!==lastShift){ lastShift=sh;
+    if(sh<.001) camera.clearViewOffset();
+    else camera.setViewOffset(innerWidth, innerHeight, wide ? -sh*innerWidth*.2 : 0, wide ? 0 : -sh*innerHeight*.16, innerWidth, innerHeight);
+    scrimEl.style.opacity=sh; scrimEl.classList.toggle('portrait',!wide); scrimC.style.opacity=1-sh; }
   // camera: during the first half of each beat, move (in log distance) from the previous beat's view to this one
   const d0=BEATS[Math.max(0,i-1)].d, d1=BEATS[i].d, e=smooth(0,.55,s), d=d0*Math.pow(d1/d0,e);
   const toTop=smooth(3/NB,3.5/NB,p);
@@ -1354,17 +1405,19 @@ function introCamera(dt){
   camera.position.copy(dir.multiplyScalar(d)); camera.lookAt(0,0,0); controls.target.set(0,0,0);
   earth.scale.setScalar(.04+.96*smooth(2/NB,2.45/NB,p));
   dotSprite.scale.setScalar(d*.03); dotSprite.material.opacity=smooth(1.05/NB,1.25/NB,p)*(1-smooth(2.1/NB,2.4/NB,p)); dotSprite.visible=dotSprite.material.opacity>.002;
-  const moving=Math.abs(state.introP-state.intro)>.0015, big=Math.max(d1/d0,d0/d1)>2.5;
-  warpEl.classList.toggle('on', moving && big && s<.55); if(moving && big && s<.55) state.warpT=performance.now()+200;
-  // the scale ruler
-  const op=smooth(2.05/NB,2.35/NB,p)*(1-smooth((NB-1)/NB,(NB-.7)/NB,p)); irEl.style.opacity=op;
+  if(Math.abs(state.introP-state.intro)>.0015 && Math.max(d1/d0,d0/d1)>2.5 && s<.55) state.warpT=performance.now()+200;   // a brief glow while travelling far
+  // the scale ruler (DOM is touched only when something changes)
+  const op=Math.round(smooth(2.05/NB,2.35/NB,p)*(1-smooth((NB-1)/NB,(NB-.7)/NB,p))*100)/100;
+  if(op!==lastOp){ irEl.style.opacity=op; lastOp=op; }
   if(op>0){ let L;
     if(BEATS[i].key==='log'){ L=6.8+(Math.log10(4.38e26)-6.8)*smooth(.12,.8,s); }
     else { const L1=beatL(i), L0=beatL(Math.max(0,i-1)) ?? L1; L = L1===null ? 6.8 : L0+(L1-L0)*e; }
-    $('ir-mk').style.left=(lx(L)*100)+'%';
-    irLms.forEach(o=>o.e.classList.toggle('on', L>=o.L-.02));
-    if(L<=27.05){ $('ir-num').innerHTML=`10<sup>${L.toFixed(1)}</sup> m`; $('ir-txt').textContent=humanM(Math.pow(10,L)); }
-    else { $('ir-num').innerHTML='edge × 10<sup>1000</sup>'; $('ir-txt').textContent='the outer face of al-Muhit'; } }
+    L=Math.round(L*100)/100;
+    if(L!==lastL){ lastL=L;
+      $('ir-mk').style.transform=`translateX(${lx(L)*irTrack.clientWidth}px)`;
+      irLms.forEach(o=>{ const v=L>=o.L-.02; if(v!==o.on){ o.e.classList.toggle('on',v); o.on=v; } });
+      if(L<=27.05){ $('ir-num').innerHTML=`10<sup>${L.toFixed(1)}</sup> m`; $('ir-txt').textContent=humanM(Math.pow(10,L)); }
+      else { $('ir-num').innerHTML='edge × 10<sup>1000</sup>'; $('ir-txt').textContent='the outer face of al-Muhit'; } } }
 }
 // what the tour shows at each moment: each sphere and its contents appear in turn
 const appear = k => smooth((k+.08)/NB,(k+.5)/NB,state.intro);
@@ -1374,7 +1427,7 @@ function applyIntroVis(t){
   sunGlow.visible=BMAP.Sun.mesh.visible; sunGlow.material.opacity=appear(bIndex('Sun'));
   const fJ=appear(bIndex('Jupiter')), fS=appear(bIndex('Saturn')), fM=appear(bIndex('Mars'));
   moonGroups[0].visible=fJ>.5; moonGroups[1].visible=fS>.5; moonGroups[2].visible=fM>.5;   // Jupiter, Saturn, Mars
-  if(fJ>.02 && !smallBodies.visible) updateSmallBodies(t);
+  if(fJ>.02 && !smallBodies.visible) updateSmallBodies(t,true);
   smallBodies.visible=fJ>.02; smallBodies.material.uniforms.uFade.value=fJ; tails.visible=fJ>.5; cometOrbits.forEach(c=>c.ln.visible=false);
   const fSt=appear(bIndex('stars')); starShell.userData.iv=fSt; zodGroup.visible=fSt>.02; zodLabels.forEach(z=>z.el._introOK=fSt>.6);
   const fG=appear(bIndex('galaxies')); for(const o of [milky,galaxies,objects]){ o.visible=fG>.01; o.material.uniforms.uFade.value=fG; }
@@ -1384,8 +1437,8 @@ function applyIntroVis(t){
   for(const o of [fabric, sightLine, sunLine, chordLine, ...dispLines, signGroup, earthTrail.line, ...elemShells]) o.visible=false;
   flexShells.forEach(m=>{ m.visible=false; m.userData.cap.visible=false; }); OUTER.forEach(o=>o.mesh.visible=false);
 }
-function enterModel(){ if(state.intro===null) return; state.intro=null; warpEl.classList.remove('on');
-  introEl.classList.add('gone'); body.classList.remove('splash'); dotSprite.visible=false;
+function enterModel(){ if(state.intro===null) return; state.intro=null;
+  introEl.classList.add('gone'); body.classList.remove('splash'); dotSprite.visible=false; camera.clearViewOffset(); lastShift=null;
   BODIES.forEach(b=>{ b.mesh.visible=true; b.mesh.scale.setScalar(1); b.lbl._introOK=true; }); sunGlow.visible=true; sunGlow.material.opacity=1;
   planetShells.forEach(sh=>sh.userData.iv=1); starShell.userData.iv=1;
   pointMats.forEach(m=>{ if(m.uniforms.uFade) m.uniforms.uFade.value=1; });
@@ -1393,9 +1446,11 @@ function enterModel(){ if(state.intro===null) return; state.intro=null; warpEl.c
   document.querySelectorAll('#left .tog input').forEach(inp=>inp.dispatchEvent(new Event('change')));   // back to the viewer's layer choices
   controls.target.set(0,0,0); controls.enabled=true;
   state.playing=true; $('t-play').textContent='Pause';
-  if(camera.position.length()>60) warpTo(30); }
+  if(camera.position.length()>60) warpTo(30);
+  setTimeout(()=>toast('Drag to turn · scroll to zoom · click any planet, star or galaxy',4500),900); }
 $('intro-enter').onclick=enterModel; $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
 $('intro-calc').onclick=()=>{ enterModel(); openCalc(); };
+addEventListener('resize',()=>{ lastShift=null; lastL=null; });
 camera.position.set(0,0,34);
 
 // ---- zoom: wheel, trackpad pinch and buttons scale the viewing distance by a constant factor,
