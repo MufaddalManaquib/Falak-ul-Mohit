@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nine Spheres, One Sky — paper</title>
+<meta name="description" content="The mathematics, physics, data and validation behind an Earth-centred model of the observable universe that reproduces every heliocentric observable, with a clear account of what is fictional.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='black'/%3E%3Ccircle cx='20' cy='20' r='15' fill='none' stroke='white' stroke-width='1.5'/%3E%3Ccircle cx='20' cy='20' r='3' fill='%239ec4ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Sora:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="js/vendor/katex/katex.min.css">
+<script defer src="js/vendor/katex/katex.min.js"></script>
+<script defer src="js/vendor/katex/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+<style>
+/* A journal page: serif text on paper white, generous margins, numbered sections, sans-serif only for apparatus. */
+:root{ --paper:#fbfaf7; --ink:#1b1c22; --soft:#4a4c58; --muted:#7a7c88; --rule:#dcd9d0; --accent:#2f5aa8; --tint:#f1efe8;
+  --f-text:"Source Serif 4",Georgia,"Times New Roman",serif; --f-ui:"Sora","Segoe UI",system-ui,sans-serif; color-scheme:light }
+@media (prefers-color-scheme:dark){ :root{ --paper:#111216; --ink:#e7e8ee; --soft:#b9bbc8; --muted:#868896; --rule:#2c2e36; --accent:#9ec4ff; --tint:#1a1b21; color-scheme:dark } }
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.68 var(--f-text);-webkit-font-smoothing:antialiased;
+  padding:0 max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px))}
+.top{max-width:760px;margin:0 auto;padding:22px 0 0;display:flex;justify-content:space-between;align-items:center;font:400 13px var(--f-ui)}
+.top a{color:var(--muted);text-decoration:none}.top a:hover{color:var(--ink)}
+article{max-width:760px;margin:0 auto;padding:40px 0 90px}
+.kind{font:400 12.5px var(--f-ui);color:var(--muted);letter-spacing:.02em;margin:0 0 14px}
+h1{font:600 clamp(28px,4.4vw,40px)/1.15 var(--f-text);letter-spacing:-.01em;margin:0 0 16px;text-wrap:balance}
+.authors{font:400 15px var(--f-ui);margin:0 0 4px}
+.meta{font:300 13px var(--f-ui);color:var(--muted);margin:0 0 30px}
+.abstract{background:var(--tint);border-radius:6px;padding:20px 24px;margin:0 0 36px}
+.abstract h2{font:500 13px var(--f-ui);margin:0 0 8px;color:var(--soft)}
+.abstract p{margin:0;font-size:16px}
+nav.toc{font:300 14px/1.9 var(--f-ui);margin:0 0 40px;padding:0;columns:2;column-gap:32px}
+nav.toc a{color:var(--soft);text-decoration:none}nav.toc a:hover{color:var(--accent)}
+h2{font:600 22px/1.3 var(--f-text);margin:46px 0 12px}
+h3{font:600 17.5px/1.35 var(--f-text);margin:28px 0 8px}
+p{margin:0 0 14px}
+a{color:var(--accent)}
+.eq{overflow-x:auto;overflow-y:hidden;margin:14px 0}
+.katex-display{margin:.6em 0}
+table{border-collapse:collapse;width:100%;font:400 14px/1.5 var(--f-ui);margin:12px 0 6px}
+.tw{overflow-x:auto;margin:16px 0}
+th,td{border-bottom:1px solid var(--rule);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-weight:500}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+caption{caption-side:top;text-align:left;font:500 13px var(--f-ui);color:var(--soft);padding:0 0 8px}
+.tag{display:inline-block;font:500 11px var(--f-ui);padding:1px 8px;border-radius:9px;border:1px solid currentColor;white-space:nowrap}
+.t-obs{color:#2e7d4f}.t-eq{color:#2f5aa8}.t-vis{color:#7a5c12}.t-app{color:#8a4b1f}.t-fic{color:#9b2c4a}.t-out{color:#555}
+@media (prefers-color-scheme:dark){ .t-obs{color:#8fd6a8}.t-eq{color:#9ec4ff}.t-vis{color:#e9d18a}.t-app{color:#f0a878}.t-fic{color:#ff9bb3}.t-out{color:#aaa} }
+.box{border-left:3px solid var(--accent);padding:4px 0 4px 18px;margin:18px 0}
+.refs{font-size:15px;padding-left:22px}
+.refs li{margin:0 0 8px}
+code{font:400 13.5px ui-monospace,Menlo,Consolas,monospace;background:var(--tint);padding:1px 5px;border-radius:4px}
+footer{font:300 13px var(--f-ui);color:var(--muted);border-top:1px solid var(--rule);padding-top:18px;margin-top:50px}
+@media (max-width:640px){ body{font-size:16px} nav.toc{columns:1} }
+</style>
+</head>
+<body>
+<div class="top"><a href="./">← Back to the model</a><a href="#refs">References</a></div>
+<article>
+<p class="kind">Working paper · model description and validation</p>
+<h1>Nine spheres, one sky: an Earth-centred model of the observable universe that reproduces heliocentric observables</h1>
+<p class="authors">Mufaddal Manaquib</p>
+<p class="meta">November 2026 · accompanies the interactive model “The universe, through a different lens” · source code in <code>js/main.js</code></p>
+
+<section class="abstract"><h2>Abstract</h2>
+<p>We describe an interactive model in which Earth is at rest at the centre of nine nested spheres, after the classical Islamic and Ismaili cosmologies: the Moon, Mercury, Venus, the Sun, Mars, Jupiter and Saturn, a sphere of fixed stars, and an outermost starless sphere, al-Falak al-Muhit. Every body is placed from a modern ephemeris, every star at its measured parallax distance and every galaxy at its comoving distance from redshift, on a single logarithmic radial map from Earth’s surface to the particle horizon. We give two geometric constructions. In the first, the spheres are perfect spheres and depth is rank; the observable sky survives because light paths are drawn as images of straight lines under an explicit map, and lengths are measured in the pulled-back metric. In the second, each sphere is a closed surface in true space that flexes just enough to pass through its planet; we prove the surfaces are always nested and pass exactly through their bodies whenever no two bodies are exactly aligned. Comparing the model with an independent heliocentric computation over 120 dates from 1900 to 2100 and 141 objects, directions agree to within 2.2 milliarcseconds and distances to 1.0 × 10⁻⁸ in both constructions. We then set out what the Earth-fixed description costs in physics (fictitious forces, coordinate speeds above c beyond 27.5 AU), how general covariance and frame dragging allow it, why the spheres cannot be physical lenses or refracting media, and which parts of the model are observation, frame choice, visual device, approximation, or fiction.</p></section>
+
+<nav class="toc" aria-label="Contents">
+<a href="#s1">1. Introduction</a><br><a href="#s2">2. Data and reference frames</a><br><a href="#s3">3. The logarithmic radial map</a><br><a href="#s4">4. Round spheres: rank geometry</a><br><a href="#s5">5. Flexing spheres: nested surfaces in true space</a><br><a href="#s6">6. Dynamics in the Earth-fixed frame</a><br><a href="#s7">7. Light</a><br>
+<a href="#s8">8. The eighth sphere: stars, galaxies, the edge</a><br><a href="#s9">9. The ninth sphere: al-Falak al-Muhit</a><br><a href="#s10">10. Numerical validation</a><br><a href="#s11">11. What is observed, equivalent, drawn, or fictional</a><br><a href="#s12">12. Limitations</a><br><a href="#s13">13. Conclusion</a><br><a href="#refs">References</a>
+</nav>
+
+<h2 id="s1">1. Introduction</h2>
+<p>The Ptolemaic order of the spheres, adopted with modifications by the Ikhwān al-Ṣafāʾ and by Ismaili authors such as Ḥamīd al-Dīn al-Kirmānī, places Earth at the centre and arranges the Moon, Mercury, Venus, the Sun, Mars, Jupiter and Saturn in successive spheres, enclosed by the sphere of the fixed stars and an outermost sphere whose daily turn carries all the rest [1–4]. Telescopic astronomy is usually presented as having refuted this picture. Strictly, what observation refuted was the claim that the planets move in physically separate, concentric shells ordered by distance: Venus shows a full cycle of phases and passes behind the Sun [5], and radar ranging shows planetary distances crossing one another over time.</p>
+<p>Observations themselves are directions, times, brightnesses, spectra and delays. They are coordinate-independent, so any description of the solar system, heliocentric, Tychonic [6] or Earth-centred, that reproduces the same relative positions predicts the same observations. General relativity makes this formal: physical laws take the same form in every coordinate system [7]. The question this paper answers is constructive. Can the nine spheres be kept, nested and centred on a still Earth, while every modern observation is reproduced exactly, and what does physics then say about the description?</p>
+<p>Section 3 introduces the radial map shared by the whole model. Sections 4 and 5 give two constructions of the spheres. Section 6 treats dynamics in the Earth-fixed frame, Section 7 light, Sections 8 and 9 the outer spheres. Section 10 reports a numerical comparison with an independent heliocentric computation, and Section 11 separates what is observed from what is chosen, drawn or imagined.</p>
+
+<h2 id="s2">2. Data and reference frames</h2>
+<p><b>Frames.</b> Positions are computed in the ICRF/J2000 equatorial frame (EQJ) and rotated to the true equator and equinox of date for apparent places, using the precession–nutation rotation of Astronomy Engine 2.1.19 [8]. Earth’s rotation uses Greenwich apparent sidereal time from the same library.</p>
+<p><b>Sun, Moon and planets.</b> Heliocentric planetary positions come from a truncated VSOP87 theory [9]; the geocentric Moon from the lunar theory of Montenbruck and Pfleger [10], both as implemented in Astronomy Engine, whose documentation states agreement with NASA JPL ephemerides to within about one arcminute [8]. Jupiter’s Galilean moons follow Lieske’s E5 theory [11].</p>
+<p><b>Apparent places.</b> For a body with heliocentric position \(\mathbf P(t)\) observed from Earth at \(\mathbf E(t)\), the light-time \(\tau\) solves \(c\tau = |\mathbf P(t-\tau)-\mathbf E(t)|\). To first order in \(v/c\), light-time and annual aberration together give the apparent direction</p>
+<div class="eq">$$\hat{\mathbf n}_{\rm app}=\frac{\mathbf P(t-\tau)-\mathbf E(t-\tau)}{|\mathbf P(t-\tau)-\mathbf E(t-\tau)|},\qquad d=|\mathbf P(t-\tau)-\mathbf E(t)|,$$</div>
+<p>where \(d\) is the light-time distance used by JPL Horizons as “range”. Gravitational deflection by the Sun (1.75″ at the limb, a few milliarcseconds elsewhere) is not applied.</p>
+<p><b>Stars.</b> The HYG database v4.1 [12] supplies positions, magnitudes, colour indices and distances from Hipparcos and Gaia parallaxes for 8,920 stars brighter than magnitude 6.5; 206 have no usable distance. The twelve zodiac figures follow the al-Ṣūfī sky culture distributed with Stellarium. Proper motion since J2000 is not applied.</p>
+<p><b>Galaxies, clusters and nebulae.</b> OpenNGC [13] supplies 9,879 galaxies with redshifts and 575 clusters and nebulae with parallaxes. Comoving distances use Planck 2018 cosmological parameters [14] (Section 8).</p>
+<p><b>Small bodies.</b> Osculating elements for 359 asteroids and dwarf planets and 118 comets and interstellar objects come from Stellarium’s <code>ssystem_minor.ini</code>, with 3I/ATLAS from the JPL Small-Body Database. They are propagated on two-body Kepler orbits; for hyperbolic orbits the Kepler equation \(e\sinh H-H=M\) is solved by Newton’s method kept inside the bracket \(0\le |H|\le \operatorname{asinh}(|M|/(e-1))\), which plain Newton iteration leaves for nearly parabolic orbits.</p>
+
+<h2 id="s3">3. The logarithmic radial map</h2>
+<p>Distances from Earth span twenty orders of magnitude, from Earth’s radius (\(6.4\times10^6\) m) to the particle horizon (\(4.4\times10^{26}\) m). The model draws everything on one radial map. For a geocentric distance \(r\) in astronomical units,</p>
+<div class="eq">$$g(r)=R_\oplus+A\ln\!\left(1+\frac{r}{b}\right),\qquad g^{-1}(\rho)=b\left(e^{(\rho-R_\oplus)/A}-1\right),$$</div>
+<p>with \(R_\oplus=0.55\) scene units (the drawn radius of Earth), \(b=0.035\) AU, and \(A=(12.8-R_\oplus)/\ln(1+9.6/b)=2.1806\), chosen so that 9.6 AU maps to radius 12.8. For \(r\gg b\) each factor of ten in distance adds the same radial step, \(A\ln 10=5.021\) scene units. The map \(\Phi_0(\mathbf x)=g(|\mathbf x|)\,\hat{\mathbf x}\) is a bijection from space minus Earth’s centre onto the region outside Earth’s drawn sphere. It preserves every direction from Earth and the order of every pair of distances. Earth’s centre itself is blown up to the sphere of radius \(R_\oplus\): a direction \(\hat{\mathbf n}\) at the centre corresponds to the point \(R_\oplus\hat{\mathbf n}\) on Earth’s surface, which is the celestial sphere in its classical sense.</p>
+
+<h2 id="s4">4. Round spheres: rank geometry</h2>
+<p>In the first construction the seven planetary spheres are perfect spheres of fixed radii \(R_i\) (Table 1), and each body is drawn on its own sphere in its true apparent direction. The positions of bodies are reproduced by a displacement field added to \(\Phi_0\):</p>
+<div class="eq">$$\Phi_1(\mathbf x)=g(|\mathbf x|)\,\hat{\mathbf x}+\frac{\sum_k w_k(\mathbf x)\,\boldsymbol\Delta_k}{1+\sum_k w_k(\mathbf x)},\qquad w_k(\mathbf x)=\left(\frac{|\mathbf x-\mathbf p_k|^2}{\sigma_k^2}+\epsilon\right)^{-2},$$</div>
+<p>where \(\mathbf p_k\) is the apparent geocentric vector of body \(k\), \(\boldsymbol\Delta_k=(R_k-g(|\mathbf p_k|))\,\hat{\mathbf p}_k\), \(\sigma_k=0.12\,|\mathbf p_k|+0.004\) AU and \(\epsilon=10^{-14}\). An extra anchor at Earth’s centre has \(\boldsymbol\Delta_0=\mathbf 0\), \(\sigma_0=0.004\) AU. At each body the weight \(w_k\) dominates and \(\Phi_1(\mathbf p_k)=R_k\hat{\mathbf p}_k\): the body sits on its sphere in its true direction.</p>
+<div class="tw"><table><caption>Table 1. Sphere radii in scene units</caption>
+<thead><tr><th>Sphere</th><th>1 Moon</th><th>2 Mercury</th><th>3 Venus</th><th>4 Sun</th><th>5 Mars</th><th>6 Jupiter</th><th>7 Saturn</th><th>8 stars (inner face)</th></tr></thead>
+<tbody><tr><td>\(R_i\)</td><td class="n">2.4</td><td class="n">4.0</td><td class="n">5.6</td><td class="n">7.4</td><td class="n">9.2</td><td class="n">11.0</td><td class="n">12.8</td><td class="n">13.8</td></tr></tbody></table></div>
+<p><b>Light.</b> A ray arriving at Earth from body \(k\) is, in true space, the straight segment \(\mathbf x(s)=s\,\mathbf p_k\), \(0\le s\le1\). On the round-sphere map it is drawn as the curve \(\gamma(s)=\Phi_1(s\,\mathbf p_k)\). Near Earth the anchor at the centre dominates, so the displacement vanishes and</p>
+<div class="eq">$$\gamma(s)=\Big(R_\oplus+\frac{A\,|\mathbf p_k|}{b}\,s+O(s^2)\Big)\hat{\mathbf p}_k\quad(s\to0).$$</div>
+<p>The drawn path therefore reaches Earth along the true apparent direction. This is the direction a telescope measures, and it is what the calculator reads back in round-sphere mode.</p>
+<p><b>Distance and the metric.</b> On the map, depth is rank rather than distance. True distances are kept in the geometry through the pulled-back metric \(h=(\Phi_1^{-1})^{*}\delta\): the length of any drawn curve is defined as the Euclidean length of its preimage. The length of \(\gamma\) is then \(|\mathbf p_k|\) exactly, and so are radar delays and light times. Because \(h\) is the flat metric in other coordinates, its Riemann tensor vanishes. The curvature of drawn light paths is a property of the drawing, not of space. Physical laws written in tensor form are unchanged by the substitution (general covariance [7]).</p>
+<p class="box">Caveat. \(\Phi_1\) is used only along rays from Earth and at the bodies. We have not proved that it is injective on all of space; for interpolating the drawing between those curves it is a visual device (Section 11).</p>
+
+<h2 id="s5">5. Flexing spheres: nested surfaces in true space</h2>
+<p>The second construction leaves space, light and orbits exactly as they are, and changes only the shape of the spheres. Write \(\rho=\ln(r/1\,\mathrm{AU})\) for log distance and let \(\hat{\mathbf n}\) range over directions from Earth. Body \(i\) (\(i=1,\dots,7\) in sphere order) has log distance \(\rho_i\) and direction \(\hat{\mathbf n}_i\). Define \(c_j(\hat{\mathbf n})=|\hat{\mathbf n}-\hat{\mathbf n}_j|^2=2(1-\hat{\mathbf n}\cdot\hat{\mathbf n}_j)\), a minimum separation \(\delta=0.06\), base radii \(\beta_i\) (log of 0.00257, 0.39, 0.72, 1.0, 1.52, 5.2, 9.5 AU), and stiffnesses \(k_j\ge k_0=5\). Sphere \(i\) is the radial graph \(r=e^{\rho_i(\hat{\mathbf n})}\) with</p>
+<div class="eq">$$\rho_i(\hat{\mathbf n})=\min\!\Big(U_i(\hat{\mathbf n}),\,\max\big(L_i(\hat{\mathbf n}),\,\beta_i\big)\Big),$$
+$$L_i=\max\!\Big(\rho_\oplus+(i{+}1)\delta,\ \max_{j\le i}\big[\rho_j+(i-j)\delta-k_j c_j\big]\Big),$$
+$$U_i=\min_{l\ge i}\big[\rho_l-(l-i)\delta+k_l c_l\big].$$</div>
+<p><b>Proposition 1 (nesting).</b> For every direction, \(\rho_{i+1}(\hat{\mathbf n})\ge\rho_i(\hat{\mathbf n})+\delta\). <i>Proof.</i> Every term of \(L_i\) reappears in \(L_{i+1}\) increased by \(\delta\), and \(L_{i+1}\) has one more term, so \(L_{i+1}\ge L_i+\delta\). The terms of \(U_{i+1}\) are those of \(U_i\) with \(l\ge i+1\), each increased by \(\delta\), so \(U_{i+1}\ge U_i+\delta\). The base radii satisfy \(\beta_{i+1}\ge\beta_i+\delta\). The function \(f(L,U,\beta)=\min(U,\max(L,\beta))\) is non-decreasing in each argument and \(f(L+\delta,U+\delta,\beta+\delta)=f(L,U,\beta)+\delta\). ∎ Consecutive spheres are therefore separated everywhere by at least a factor \(e^{0.06}\approx1.06\) in distance. They never touch, whatever the planets do.</p>
+<p><b>Proposition 2 (exact passage).</b> If for every pair \(j&lt;l\) with \(C_{jl}=\rho_j-\rho_l+(l-j)\delta>0\) the stiffnesses satisfy \(k_j,k_l\ge C_{jl}/|\hat{\mathbf n}_j-\hat{\mathbf n}_l|^2\), then \(\rho_i(\hat{\mathbf n}_i)=\rho_i\) for every \(i\). <i>Proof.</i> At \(\hat{\mathbf n}_i\) the \(j=i\) term of \(L_i\) and the \(l=i\) term of \(U_i\) both equal \(\rho_i\). The stiffness condition makes every other term of \(L_i\) at most \(\rho_i\) and every other term of \(U_i\) at least \(\rho_i\); the Earth term is below \(\rho_i\) for all bodies. Hence \(L_i(\hat{\mathbf n}_i)=\rho_i=U_i(\hat{\mathbf n}_i)\) and the clamp returns \(\rho_i\). ∎ The model uses \(k=2.05\,C_{jl}/|\hat{\mathbf n}_j-\hat{\mathbf n}_l|^2\), floored at \(k_0\).</p>
+<p>Each \(\rho_i\) is continuous (a composition of maxima and minima of continuous functions), so each flexing sphere is a closed, star-shaped, piecewise-smooth surface around Earth, topologically a sphere. When planets are in sphere order and well separated, every sphere is round apart from a gentle bulge. When a planet is out of sphere order by distance (for example Venus beyond the Sun near superior conjunction), its sphere reaches outward in a narrow spike around its direction while the outer spheres dimple away from it. The width of the spike is about \(\sqrt{C/k}\).</p>
+<p><b>The one exception.</b> When two bodies out of sphere order are exactly aligned as seen from Earth (\(\hat{\mathbf n}_j=\hat{\mathbf n}_l\)), the stiffness condition cannot be met. A sphere cannot pass through a body while lying entirely inside a farther sphere that passes through a nearer body in the same direction. This happens only at the instant of an exact transit, occultation or conjunction. The implementation floors \(|\hat{\mathbf n}_j-\hat{\mathbf n}_l|^2\) at \(4\times10^{-6}\) (about 7′), so within that separation passage is approximate.</p>
+<p><b>Sun-centred display.</b> For the view centred on the Sun, the same surfaces are translated with Earth. In the flexing mode all positions are drawn on a linear scale of 1.45 scene units per AU, with the Moon’s distance from Earth enlarged sixty-fold for visibility, so planetary paths around the Sun are their true Kepler ellipses. Earth’s yearly path and the spheres travel together. Nothing about the sky seen from Earth changes.</p>
+
+<h2 id="s6">6. Dynamics in the Earth-fixed frame</h2>
+<p>In an inertial (barycentric) frame the bodies obey \(\ddot{\mathbf r}_i=-\sum_{j\ne i}GM_j(\mathbf r_i-\mathbf r_j)/|\mathbf r_i-\mathbf r_j|^3\) plus small post-Newtonian terms. In geocentric coordinates \(\boldsymbol\rho_i=\mathbf r_i-\mathbf r_\oplus\), which also rotate with Earth at angular velocity \(\boldsymbol\Omega\), the same motion reads</p>
+<div class="eq">$$\ddot{\boldsymbol\rho}_i=\mathbf a_i^{\rm grav}-\ddot{\mathbf r}_\oplus-2\boldsymbol\Omega\times\dot{\boldsymbol\rho}_i-\boldsymbol\Omega\times(\boldsymbol\Omega\times\boldsymbol\rho_i)-\dot{\boldsymbol\Omega}\times\boldsymbol\rho_i .$$</div>
+<p>The extra terms are the fictitious forces of a non-inertial frame. The largest, \(-\ddot{\mathbf r}_\oplus\), is a uniform field of strength \(GM_\odot/(1\,\mathrm{AU})^2=5.93\ \mathrm{mm\,s^{-2}}\) pointing away from the Sun. It carries the Sun around its yearly circuit of Earth. Earth’s own gravity at the Sun’s distance is \(GM_\oplus/(1\,\mathrm{AU})^2=1.78\times10^{-5}\ \mathrm{mm\,s^{-2}}\), 333,000 times too weak, the ratio of the Sun’s mass to Earth’s. Without the frame terms an Earth-centred description violates Newton’s laws; with them it is exact. The rotational terms are what swing Foucault’s pendulum [15] and deflect winds and projectiles.</p>
+<p><b>Relativity.</b> General relativity admits any coordinates [7]. In flat spacetime written in coordinates rotating with Earth (cylindrical \(\rho,\varphi,z\)),</p>
+<div class="eq">$$ds^2=-\left(c^2-\Omega^2\rho^2\right)dt^2+2\Omega\rho^2\,d\varphi\,dt+d\rho^2+\rho^2d\varphi^2+dz^2 .$$</div>
+<p>Beyond the light cylinder \(\rho=c/\Omega=27.5\) AU, \(g_{tt}\) changes sign: no observer can remain at fixed coordinates there, and objects at rest in the inertial frame have coordinate speeds above \(c\) (Proxima Centauri about 9,800 \(c\)). These are coordinate speeds. No signal outruns light locally and no physical law is broken, but the Earth-fixed coordinates stop describing anything that can be at rest beyond 27.5 AU.</p>
+<p><b>Frame dragging and Mach’s principle.</b> A rotating mass shell drags inertial frames inside it. In the weak-field limit the interior frames rotate at \(\omega=\tfrac{4GM}{3c^2R}\,\Omega_{\rm shell}\) [16], and Brill and Cohen showed in full general relativity that the dragging becomes complete as the shell approaches its own gravitational radius [17]. For a mass comparable to that of the observable universe, \(GM/(c^2R)\) is of order unity, the coincidence behind Sciama’s account of inertia [18]. Lynden-Bell, Katz and Bičák showed that in relativistic cosmology the inertial frames are fixed by the distribution and motion of matter through the constraint equations [19]. Observationally, gyroscopes stay fixed relative to distant quasars; Gravity Probe B measured the tiny extra dragging by Earth itself [20]. In Earth-fixed language this is a Machian reading: the turning sky carries the local inertial frames around once a sidereal day. The reading is consistent with every observation. Attributing that role to a physical outermost shell is an interpretation, not a result (Section 9).</p>
+
+<h2 id="s7">7. Light</h2>
+<p>In every description light moves locally at \(c\). Aberration [21], light-time [22], parallax [23] and the solar deflection, \(1.75''\) at the limb [24] and now confirmed by VLBI to \(|\gamma-1|\sim10^{-4}\) [25], together with the Shapiro delay [26] (confirmed by Cassini to \(\gamma-1=(2.1\pm2.3)\times10^{-5}\) [27]; review in [28]), are physical effects. The heliocentric and flexing-sphere descriptions share them because their space is the same space. In the round-sphere map, light paths are drawn curved, sometimes by tens of degrees; the curvature is that of the map (Section 4).</p>
+<p><b>Why the spheres cannot be physical lenses.</b> A mass \(M\) deflects a ray passing at distance \(b\) by \(\alpha=4GM/(c^2b)\). Bending paths by about half a radian at \(b\sim1\) AU would need \(M\approx\alpha c^2b/(4G)\approx1.3\times10^7\,M_\odot\), which would destroy every planetary orbit and add delays radar does not see.</p>
+<p><b>Why they cannot be refracting crystal.</b> A graded-index medium can steer light along chosen paths, as in transformation optics [29, 30]. Every real medium is dispersive, however: colours, radio waves and radar pulses would follow different paths and arrive at different times. Optical and radio positions, and radar and optical timings, agree. The spheres in this model are therefore geometry, not matter.</p>
+
+<h2 id="s8">8. The eighth sphere: stars, galaxies and the edge</h2>
+<p><b>Stars at their distances.</b> Each star sits at \(r=1/\varpi\) on the logarithmic map, so the zodiac figures stretch through depth while their directions from Earth are unchanged. Two yearly effects are carried by the eighth sphere as a motion locked to the Sun’s annual circuit. For a star in direction \(\hat{\mathbf n}\) with parallax \(\varpi\) (radians per AU), Earth heliocentric position \(\mathbf E\) and velocity \(\mathbf V\),</p>
+<div class="eq">$$\hat{\mathbf n}_1=\frac{\hat{\mathbf n}-\varpi\,[\mathbf E-(\mathbf E\cdot\hat{\mathbf n})\hat{\mathbf n}]}{|\cdots|},\qquad \hat{\mathbf n}_{\rm app}=\frac{\hat{\mathbf n}_1+[\mathbf V-(\mathbf V\cdot\hat{\mathbf n}_1)\hat{\mathbf n}_1]/c}{|\cdots|}.$$</div>
+<p>The first is parallax (at most 0.77″, for Proxima Centauri), the second aberration (20.5″). Both are applied at true size in the calculator and can be magnified in the display.</p>
+<p><b>Galaxies.</b> Galaxy distances are comoving distances computed from heliocentric redshift in a flat ΛCDM cosmology with \(H_0=67.66\ \mathrm{km\,s^{-1}\,Mpc^{-1}}\), \(\Omega_m=0.30966\) and radiation \(\Omega_r=9.1\times10^{-5}\) (the Planck 2018 values as realised in Astropy’s Planck18):</p>
+<div class="eq">$$D_C(z)=\frac{c}{H_0}\int_0^z\frac{dz'}{E(z')},\qquad E(z)=\sqrt{\Omega_m(1+z)^3+\Omega_r(1+z)^4+\Omega_\Lambda},\qquad t_L(z)=\frac{1}{H_0}\int_0^z\frac{dz'}{(1+z')E(z')}.$$</div>
+<p>About 45 nearby galaxies, where peculiar velocities dominate redshift, use redshift-independent distances from the literature, and members of the Virgo cluster are placed at the cluster distance of 16.5 Mpc. Beyond about two billion light-years, where the catalogue ends, galaxies are represented statistically at the observed comoving number density (Section 11). The last-scattering surface (\(z=1089.8\)) lies at \(D_C=13.91\) Gpc (45.35 billion light-years) and the particle horizon at 14.19 Gpc (46.27 billion light-years) [14, 31]. Light from near the horizon set out 13.8 billion years ago.</p>
+
+<h2 id="s9">9. The ninth sphere: al-Falak al-Muhit</h2>
+<p>Al-Falak al-Muhit is drawn as a starless sphere whose inner face lies just beyond the particle horizon (\(R_{\rm in}=g(D_{\rm hor})+0.8\)) and whose outer face lies a thousand powers of ten farther on the same map, \(R_{\rm out}=g(D_{\rm hor})+1000\,A\ln10\), corresponding to \(10^{1000}\) times the horizon distance. Its daily turn, once per sidereal day, carries every inner sphere in the Earth-fixed frame.</p>
+<p>Nothing beyond the particle horizon can have sent a signal to Earth, so no observation can confirm or rule out anything placed there. That makes the ninth sphere consistent with physics in a trivial sense: no measurement can contradict it. For the same reason, no measurement supports it. Its existence, its thickness, its rotation and any role in fixing inertial frames (Section 6) are postulates of the model, not results.</p>
+
+<h2 id="s10">10. Numerical validation</h2>
+<p><b>Method.</b> For each object and time the model’s answer is obtained by placing the object in the Earth-centred scene exactly as the display does, then reading the answer back from the scene geometry alone. In flexing mode the direction is that of the displayed point and the distance is \(g^{-1}\) of its radius. In round-sphere mode the direction is the tangent of the drawn light path at Earth, and the distance is the metric length of that path. The heliocentric answer is computed independently from heliocentric vectors with five light-time iterations, using the apparent-place formula of Section 2, Earth’s exact ephemeris position at the light-departure time, and the star formula of Section 8. Both use the same underlying planetary theory. Agreement therefore tests that the Earth-centred geometry is an exact change of viewpoint, not that the planetary theory is right (see below).</p>
+<div class="tw"><table><caption>Table 2. Model against heliocentric computation, 120 epochs evenly spaced 1900–2100, 141 objects (7 major bodies, 4 Galilean moons, 31 bright stars, 99 asteroids, comets and interstellar objects), both geometries: 33,840 comparisons</caption>
+<thead><tr><th>Quantity</th><th>Flexing spheres</th><th>Round spheres</th></tr></thead>
+<tbody>
+<tr><td>Largest angle between the two directions</td><td class="n">2.21 mas</td><td class="n">2.21 mas</td></tr>
+<tr><td>Largest relative difference in distance</td><td class="n">1.0 × 10⁻⁸</td><td class="n">1.0 × 10⁻⁸</td></tr>
+<tr><td>Worst case</td><td colspan="2">Mars, 2084; due to Astronomy Engine’s internal apparent-place routine differing from the explicit first-order formula</td></tr>
+</tbody></table></div>
+<div class="tw"><table><caption>Table 3. Flexing-sphere construction, 60 epochs 1900–2100, about 7,400 sampled directions per sphere</caption>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Largest \(|\rho_i(\hat{\mathbf n}_i)-\rho_i|\) (sphere misses its body)</td><td class="n">4.7 × 10⁻¹³ in log distance</td></tr>
+<tr><td>Directions where two spheres cross or touch</td><td class="n">0</td></tr>
+</tbody></table></div>
+<p><b>Events.</b> Starting from 2 November 2026, the next new and full Moon, lunar apogee, greatest elongations of Mercury and Venus, December solstice, March equinox, solar and lunar eclipses, oppositions of Mars, Jupiter and Saturn, and the transits of Mercury (13 November 2032) and Venus (11 December 2117) were found by searching the ephemeris. At each instant the model’s own geometry was checked for the defining condition. All 14 checks pass: for example, at the March equinox the Sun’s longitude in the model is 0.0000°, and at the Mercury transit its separation from the Sun’s centre is 9.59′, matching the ephemeris. New and full Moon show 0.0056° rather than 0°; the ephemeris defines lunar phase with the Sun’s apparent and the Moon’s geometric longitude, a 20″ convention.</p>
+<p><b>Independent check against observation.</b> Agreement between the two columns says nothing about whether the planetary theory matches the sky. That test is external: Astronomy Engine reports agreement with JPL ephemerides to about an arcminute [8], and JPL’s ephemerides are fitted to radar ranging, spacecraft tracking and lunar laser ranging. The calculator links each solar-system result to a NASA JPL Horizons query for the same instant so that readers can check it themselves.</p>
+
+<h2 id="s11">11. What is observed, equivalent, drawn, or fictional</h2>
+<div class="tw"><table><caption>Table 4. Classification of every element of the model</caption>
+<thead><tr><th>Element</th><th>Status</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Directions of the Sun, Moon, planets, Galilean moons, stars, asteroids and comets</td><td><span class="tag t-obs">matches observation</span></td><td>Identical to the heliocentric computation (Table 2)</td></tr>
+<tr><td>Distances, light times, radar delays</td><td><span class="tag t-obs">matches observation</span></td><td>Read from the geometry (flexing) or the metric (round)</td></tr>
+<tr><td>Phases, elongations, eclipses, transits, oppositions, seasons, apsides</td><td><span class="tag t-obs">matches observation</span></td><td>All 14 event checks pass</td></tr>
+<tr><td>Stellar parallax and aberration, precession, the daily motion of the sky</td><td><span class="tag t-obs">matches observation</span></td><td>Carried by the eighth and ninth spheres</td></tr>
+<tr><td>Planet orbits around the Sun (flexing, Sun-centred view)</td><td><span class="tag t-obs">matches observation</span></td><td>True Kepler ellipses</td></tr>
+<tr><td>Earth at rest; the sky turning daily; Sun circling Earth yearly</td><td><span class="tag t-eq">equivalent frame choice</span></td><td>Requires fictitious forces (Section 6); not testable against the heliocentric choice</td></tr>
+<tr><td>Coordinate speeds above c beyond 27.5 AU</td><td><span class="tag t-eq">equivalent frame choice</span></td><td>Property of rotating coordinates, not a physical speed</td></tr>
+<tr><td>The turning sky carrying inertial frames around</td><td><span class="tag t-eq">equivalent interpretation</span></td><td>Machian reading consistent with observation [17–19]</td></tr>
+<tr><td>Logarithmic radial scale</td><td><span class="tag t-vis">visual device</span></td><td>Monotone; preserves directions and order</td></tr>
+<tr><td>Round spheres: depth as rank; curved light paths; the warped grid</td><td><span class="tag t-vis">visual device</span></td><td>A map of flat space; Riemann tensor zero</td></tr>
+<tr><td>Enlarged planets and moons; compressed moon orbits; Moon distance ×60 and linear 1.45 units/AU in the Sun-centred view</td><td><span class="tag t-vis">visual device</span></td><td>For visibility only</td></tr>
+<tr><td>Statistical main belt and Trojans; Milky Way density model; galaxies beyond the catalogue; microwave-background pattern (its dipole is real)</td><td><span class="tag t-vis">representative, not catalogued</span></td><td>Statistical or illustrative</td></tr>
+<tr><td>Planetary theory accuracy (~1′); Kepler orbits without perturbations; no proper motion; Saturn and Mars moon phases; redshift distances without peculiar velocities</td><td><span class="tag t-app">approximation</span></td><td>See Section 12</td></tr>
+<tr><td>The spheres as physical crystalline bodies</td><td><span class="tag t-fic">ruled out if literal</span></td><td>Would need ~10⁷ solar masses as lenses, or dispersion as a medium (Section 7)</td></tr>
+<tr><td>Earth-centred Newtonian dynamics without frame forces</td><td><span class="tag t-fic">ruled out if literal</span></td><td>Sun would need 333,000 × Earth’s pull (Section 6)</td></tr>
+<tr><td>Al-Falak al-Muhit: existence, 10¹⁰⁰⁰ thickness, rotation, dragging of inertial frames</td><td><span class="tag t-fic">fiction / postulate</span></td><td>Beyond the particle horizon; unobservable either way</td></tr>
+<tr><td>Correspondence of the ten intellects and the ranks of the daʿwa with the spheres (optional Haqiqat layer)</td><td><span class="tag t-out">outside physics</span></td><td>Metaphysical and theological; not a physical claim</td></tr>
+</tbody></table></div>
+
+<h2 id="s12">12. Limitations</h2>
+<p>The planetary theory is compact and accurate to about an arcminute, not to the milliarcsecond level of the internal comparison. Small-body orbits are pure two-body Kepler orbits from published osculating elements; planetary perturbations accumulate away from the element epoch, so positions decades from the epoch can be wrong by arcminutes to degrees. Proper motions are not applied, so fast-moving stars differ from current catalogues by up to a few arcseconds. The phases of Saturn’s and Mars’s moons along their orbits are not from an ephemeris. Galaxy distances from heliocentric redshift ignore peculiar velocities (about ±4 Mpc), and the cosmological model is fixed. Solar gravitational deflection and relativistic aberration terms are omitted. Of the geometric constructions, \(\Phi_1\) is not proved globally injective, and flexing passage is approximate within about 7′ of an exact alignment.</p>
+
+<h2 id="s13">13. Conclusion</h2>
+<p>Nine nested spheres centred on a still Earth can carry every modern observation exactly. With perfect spheres, depth becomes rank and light is drawn on a curved map of unchanged flat space. With flexing spheres, space, light and orbits are untouched and the spheres bend just enough to hold their planets, never touching. In both, directions and distances agree with an independent heliocentric computation to milliarcseconds and parts in 10⁸. The price is paid in simplicity rather than correctness: fictitious forces, a rotating frame that cannot hold objects at rest beyond 27.5 AU, and an outermost sphere that no observation can reach. What physics cannot decide is which point is the centre. What it does single out, the inertial frames that do not rotate against the distant galaxies, the Earth-fixed description can only reproduce through frame terms, or interpret through frame dragging.</p>
+
+<h2 id="refs">References</h2>
+<ol class="refs">
+<li>Ptolemy, <i>Almagest</i>, trans. G. J. Toomer (Duckworth, London, 1984).</li>
+<li>Ikhwān al-Ṣafāʾ, <i>On Astronomia: An Arabic Critical Edition and English Translation of Epistle 3</i>, ed. and trans. F. J. Ragep and T. Mimura (Oxford University Press with the Institute of Ismaili Studies, 2015).</li>
+<li>Ḥamīd al-Dīn al-Kirmānī, <i>Rāḥat al-ʿaql</i>, ed. M. Kāmil Ḥusayn and M. Muṣṭafā Ḥilmī (Cairo, 1953); D. De Smet, <i>La quiétude de l’intellect</i> (Peeters, Leuven, 1995).</li>
+<li>F. Daftary, <i>The Ismāʿīlīs: Their History and Doctrines</i>, 2nd ed. (Cambridge University Press, 2007).</li>
+<li>G. Galilei, <i>Sidereus Nuncius</i> (Venice, 1610); the phases of Venus were announced in letters of December 1610.</li>
+<li>T. Brahe, <i>De mundi aetherei recentioribus phaenomenis</i> (Uraniborg, 1588).</li>
+<li>A. Einstein, “Die Grundlage der allgemeinen Relativitätstheorie,” <i>Annalen der Physik</i> 49, 769 (1916).</li>
+<li>D. Cross, <i>Astronomy Engine</i>, version 2.1.19, software and documentation, github.com/cosinekitty/astronomy.</li>
+<li>P. Bretagnon and G. Francou, “Planetary theories in rectangular and spherical variables: VSOP87 solutions,” <i>Astronomy &amp; Astrophysics</i> 202, 309 (1988).</li>
+<li>O. Montenbruck and T. Pfleger, <i>Astronomy on the Personal Computer</i>, 4th ed. (Springer, 2000).</li>
+<li>J. H. Lieske, “Galilean satellite ephemerides E5,” <i>Astronomy &amp; Astrophysics Supplement</i> 129, 205 (1998).</li>
+<li>D. Nash, <i>HYG Database</i> v4.1 (astronexus), CC BY-SA 4.0.</li>
+<li>M. Verga, <i>OpenNGC</i>, CC BY-SA 4.0.</li>
+<li>Planck Collaboration, N. Aghanim et al., “Planck 2018 results. VI. Cosmological parameters,” <i>Astronomy &amp; Astrophysics</i> 641, A6 (2020).</li>
+<li>L. Foucault, “Démonstration physique du mouvement de rotation de la Terre au moyen du pendule,” <i>Comptes Rendus</i> 32, 135 (1851).</li>
+<li>H. Thirring, “Über die Wirkung rotierender ferner Massen in der Einsteinschen Gravitationstheorie,” <i>Physikalische Zeitschrift</i> 19, 33 (1918).</li>
+<li>D. R. Brill and J. M. Cohen, “Rotating masses and their effect on inertial frames,” <i>Physical Review</i> 143, 1011 (1966).</li>
+<li>D. W. Sciama, “On the origin of inertia,” <i>Monthly Notices of the Royal Astronomical Society</i> 113, 34 (1953).</li>
+<li>D. Lynden-Bell, J. Katz and J. Bičák, “Mach’s principle from the relativistic constraint equations,” <i>Monthly Notices of the Royal Astronomical Society</i> 272, 150 (1995).</li>
+<li>C. W. F. Everitt et al., “Gravity Probe B: final results of a space experiment to test general relativity,” <i>Physical Review Letters</i> 106, 221101 (2011).</li>
+<li>J. Bradley, “An account of a new discovered motion of the fix’d stars,” <i>Philosophical Transactions</i> 35, 637 (1729).</li>
+<li>O. Rømer, “Démonstration touchant le mouvement de la lumière,” <i>Journal des Sçavans</i> (1676).</li>
+<li>F. W. Bessel, “Bestimmung der Entfernung des 61sten Sterns des Schwans,” <i>Astronomische Nachrichten</i> 16, 65 (1838); Gaia Collaboration, A. Vallenari et al., “Gaia Data Release 3,” <i>Astronomy &amp; Astrophysics</i> 674, A1 (2023).</li>
+<li>F. W. Dyson, A. S. Eddington and C. Davidson, “A determination of the deflection of light by the Sun’s gravitational field,” <i>Philosophical Transactions of the Royal Society A</i> 220, 291 (1920).</li>
+<li>S. B. Lambert and C. Le Poncin-Lafitte, “Improved determination of γ by VLBI,” <i>Astronomy &amp; Astrophysics</i> 529, A70 (2011).</li>
+<li>I. I. Shapiro, “Fourth test of general relativity,” <i>Physical Review Letters</i> 13, 789 (1964).</li>
+<li>B. Bertotti, L. Iess and P. Tortora, “A test of general relativity using radio links with the Cassini spacecraft,” <i>Nature</i> 425, 374 (2003).</li>
+<li>C. M. Will, “The confrontation between general relativity and experiment,” <i>Living Reviews in Relativity</i> 17, 4 (2014).</li>
+<li>U. Leonhardt, “Optical conformal mapping,” <i>Science</i> 312, 1777 (2006).</li>
+<li>J. B. Pendry, D. Schurig and D. R. Smith, “Controlling electromagnetic fields,” <i>Science</i> 312, 1780 (2006).</li>
+<li>T. M. Davis and C. H. Lineweaver, “Expanding confusion: common misconceptions of cosmological horizons and the superluminal expansion of the universe,” <i>Publications of the Astronomical Society of Australia</i> 21, 97 (2004).</li>
+</ol>
+
+<footer>
+<p><b>Reproducibility.</b> Everything described here runs in the browser from <code>js/main.js</code>. The radial map is <code>g</code>; the round-sphere map is <code>dispPoint</code> and <code>dispBody</code>; the flexing spheres are <code>flexRho</code> and <code>updateFlex</code>; apparent places are <code>geoApparent</code> and <code>sbApparent</code>; the two calculator columns are <code>modelVector</code> and <code>helioRead</code>; the event checks are <code>eventsFrom</code>. Opening the browser console on the model page and running <code>__validate(120)</code> repeats the comparison of Tables 2 and 3, and <code>__flexCheck()</code> checks the current flexing spheres.</p>
+<p>The optional Haqiqat layer presents a correspondence from the Ismaili philosophical tradition and makes no physical claim.</p>
+</footer>
+</article>
+</body>
+</html>

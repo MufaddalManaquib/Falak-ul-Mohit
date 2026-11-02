@@ -20,7 +20,6 @@ button,input,select{font:inherit;color:inherit}
 body:not(.haq-on) .haq{display:none!important}
 body.hud-off #ui>*:not(#toast):not(#caption){opacity:0;pointer-events:none}
 body.splash #ui>*, body.splash #ruler{opacity:0!important;pointer-events:none!important}
-body.splash:not(.reveal) #labels{opacity:0!important}
 #labels,#ruler{transition:opacity .8s}
 
 /* ---------- stage ---------- */
@@ -277,3 +276,69 @@ select.tb option{background:#0b0c12}
   #caption{bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 140px)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- intro: step-by-step tour and scale ruler ---------- */
+.beat.top{align-self:start;margin-top:13vh;max-width:min(760px,100%)}
+.beat .btxt p{text-shadow:0 2px 24px #000,0 0 6px #000}
+.beat .chip{margin:18px auto 0;max-width:46ch;font:300 clamp(13px,1.25vw,15px)/1.65 var(--f-body);color:#9a9fbd;text-shadow:0 0 10px #000}
+.beat .ctas{margin-top:28px}
+.beat .lnks{display:flex;gap:6px 22px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.beat .lnks .lnk{margin-top:0;text-decoration:none}
+.iruler{position:fixed;left:50%;bottom:calc(max(22px,env(safe-area-inset-bottom,0px)) + 70px);transform:translateX(-50%);width:min(880px,86vw);opacity:0;pointer-events:none}
+.ir-read{display:flex;gap:14px;align-items:baseline;justify-content:center;margin-bottom:26px}
+.ir-read b{font:300 18px var(--f-display);color:#f4f5ff;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.ir-read span{font-size:12.5px;color:#8b90b8}
+.ir-track{position:relative;height:44px}
+.ir-axis{position:absolute;left:0;width:86%;top:18px;height:1px;background:rgba(255,255,255,.3)}
+.ir-mseg{position:absolute;left:89.5%;right:0;top:18px;height:1px;background:linear-gradient(90deg,rgba(158,196,255,.55),rgba(158,196,255,0))}
+.ir-brk{position:absolute;left:87.6%;top:8px;font-size:12px;color:#4a4e66}
+.ir-tk{position:absolute;top:15px;width:1px;height:7px;background:rgba(255,255,255,.28)}
+.ir-tk.major{top:13px;height:11px;background:rgba(255,255,255,.5)}
+.ir-tl{position:absolute;top:28px;transform:translateX(-50%);font-size:9.5px;color:#5a5e78;white-space:nowrap}
+.ir-lm{position:absolute;bottom:30px;transform:translateX(-50%);font-size:10.5px;color:#3a3d52;white-space:nowrap;transition:color .5s}
+.ir-lm.hi{bottom:44px}
+.ir-lm.on{color:#c9cde6}
+.ir-lm.muhit.on{color:var(--ice)}
+.ir-mk{position:absolute;top:18px;width:9px;height:9px;margin:-4px 0 0 -4.5px;border-radius:50%;background:var(--ice);box-shadow:0 0 12px var(--ice)}
+
+/* ---------- calculator ---------- */
+#calc{position:fixed;inset:0;z-index:35;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));background:rgba(0,0,0,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#calc .doc{position:relative;width:min(980px,100%);max-height:100%;overflow:auto;border-radius:20px;padding:36px clamp(18px,4vw,44px) 40px;scrollbar-width:thin;scrollbar-color:#333 transparent;outline:none}
+#calc .doc .x{position:sticky;top:0;float:right;margin:-14px -22px 0 0}
+#calc h2{margin:0 0 8px;font:300 clamp(22px,3vw,30px)/1.2 var(--f-display)}
+#calc h3{margin:34px 0 8px;font:400 15px/1.3 var(--f-display)}
+#calc p{font-size:13.5px;line-height:1.7;color:var(--soft);max-width:78ch}
+#calc p.sub{color:var(--muted);margin-top:0}
+#calc a{color:var(--ice)}
+.cform{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 16px;margin:22px 0 18px;align-items:end}
+.cform label{display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--muted);min-width:0}
+.cform label.wide{grid-column:span 2}
+.cform select,.cform input{width:100%;min-width:0;background:rgba(255,255,255,.03);border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--ink);color-scheme:dark}
+.cform select option,.cform optgroup{background:#0b0c12}
+.cbtns{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}
+.ctab{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px}
+.ctab th,.ctab td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-weight:300;font-variant-numeric:tabular-nums}
+.ctab th{color:var(--ink);font-weight:400}
+.ctab th span{font-size:10.5px;color:var(--muted)}
+.ctab td:first-child{color:var(--muted)}
+.ctab td:last-child{color:var(--ice);white-space:nowrap}
+#calc .tw{overflow-x:auto}
+.clinks p{margin:8px 0}
+.clinks .note,.evc{font-size:12px}
+.evl{display:flex;flex-direction:column}
+.evr{display:grid;grid-template-columns:220px 1fr auto;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.evw{display:flex;flex-direction:column;gap:2px}
+.evw b{font-weight:400;font-size:13px;color:var(--ink)}
+.evw span{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.evc{color:var(--soft);line-height:1.55}
+.evc .y,.evc .n{font-weight:500;margin-right:4px}
+.btn.sm{padding:5px 12px;font-size:12px}
+.lnk2{border:0;background:none;color:var(--ice);padding:0;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+a.icon{color:var(--muted)}
+@media (max-width:860px){
+  .cform{grid-template-columns:1fr 1fr}
+  .evr{grid-template-columns:1fr;gap:6px}
+  .ir-tl{display:none}
+  .ir-lm{font-size:9px}
+  .beat.top{margin-top:16vh}
+}

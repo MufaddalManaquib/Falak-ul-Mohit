@@ -341,10 +341,10 @@ const TG=[[-0.0548755604,-0.8734370902,-0.4838350155],[0.4941094279,-0.444829630
 const galToS=(x,y,z)=>{ const ex=TG[0][0]*x+TG[1][0]*y+TG[2][0]*z, ey=TG[0][1]*x+TG[1][1]*y+TG[2][1]*z, ez=TG[0][2]*x+TG[1][2]*y+TG[2][2]*z; return [ex,ez,-ey]; };
 function pointsMat(extra=''){
   return new THREE.ShaderMaterial({
-    uniforms:{uPx:{value:1}, uT:{value:0}},
+    uniforms:{uPx:{value:1}, uT:{value:0}, uFade:{value:1}},
     vertexShader:`attribute float aSize; attribute vec4 aCol; uniform float uPx; varying vec4 vC;
       void main(){ vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=aSize*uPx; vC=aCol; vC.a*=clamp(pow(150./max(-mv.z,1.),.85),.06,1.); }`,
-    fragmentShader:`varying vec4 vC; void main(){ vec2 p=gl_PointCoord-.5; float r=length(p); if(r>.5) discard; float a=smoothstep(.5,0.,r); gl_FragColor=vec4(vC.rgb, vC.a*a*a); }`,
+    fragmentShader:`uniform float uFade; varying vec4 vC; void main(){ vec2 p=gl_PointCoord-.5; float r=length(p); if(r>.5) discard; float a=smoothstep(.5,0.,r); gl_FragColor=vec4(vC.rgb, vC.a*a*a*uFade); }`,
     transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
 }
 function makePoints(pos, col, size){ const geo=new THREE.BufferGeometry();
@@ -603,8 +603,13 @@ function orbitPos(o, jd, out){ // heliocentric position, scene axes (equatorial 
   if(e<1){ let M=(o.M0 + o.n*(jd-o.ep))*DEG; M=((M%(2*Math.PI))+3*Math.PI)%(2*Math.PI)-Math.PI;
     let E = e>.8 ? Math.PI*Math.sign(M||1) : M; for(let k=0;k<20;k++){ const f=E-e*Math.sin(E)-M; E-=f/(1-e*Math.cos(E)); }
     r=o.a*(1-e*Math.cos(E)); nu=2*Math.atan2(Math.sqrt(1+e)*Math.sin(E/2), Math.sqrt(1-e)*Math.cos(E/2)); }
-  else { const ee=Math.max(e,1.000001), a=o.q/(ee-1), M=GK/Math.pow(a,1.5)*(jd-o.Tp); let H=Math.asinh(M/ee);
-    for(let k=0;k<40;k++){ const f=ee*Math.sinh(H)-H-M; H-=f/(ee*Math.cosh(H)-1); }
+  else { const ee=Math.max(e,1.000001), a=o.q/(ee-1), M=GK/Math.pow(a,1.5)*(jd-o.Tp);
+    // hyperbolic Kepler equation e·sinh H − H = M, solved by Newton's method kept inside a bracket
+    // (plain Newton overshoots for nearly parabolic orbits); f is monotonic, and |H| ≤ asinh(|M|/(e−1))
+    const sg=M<0?-1:1, Ma=Math.abs(M); let lo=0, hi=Math.asinh(Ma/(ee-1)), H=Math.min(hi, Math.cbrt(6*Ma/ee));
+    for(let k=0;k<80;k++){ const f=ee*Math.sinh(H)-H-Ma; if(f>0) hi=H; else lo=H; let Hn=H-f/(ee*Math.cosh(H)-1);
+      if(!(Hn>lo && Hn<hi)) Hn=(lo+hi)/2; if(Math.abs(Hn-H)<1e-14*Math.max(1,H)){ H=Hn; break; } H=Hn; }
+    H*=sg;
     r=a*(ee*Math.cosh(H)-1); nu=2*Math.atan(Math.sqrt((ee+1)/(ee-1))*Math.tanh(H/2)); }
   const uu=o.w+nu, cu=Math.cos(uu), su=Math.sin(uu);
   const X=r*(o.cO*cu-o.sO*su*o.ci), Y=r*(o.sO*cu+o.cO*su*o.ci), Z=r*su*o.si;
@@ -640,12 +645,25 @@ SB.forEach((o,i)=>{ if(o.kind>=4 && FAMOUS.some(f=>o.name.includes(f))){ const p
   const ln=new THREE.Line(geo,new THREE.LineBasicMaterial({color:o.kind===5?0xd8c8f0:0xc8d8ff,transparent:true,opacity:.09,depthWrite:false,blending:THREE.AdditiveBlending})); ln.frustumCulled=false; prec.add(ln);
   cometOrbits.push({o,pts,ln}); } });
 function orbitHel(o,nu,r){ const uu=o.w+nu, cu=Math.cos(uu), su=Math.sin(uu); const X=r*(o.cO*cu-o.sO*su*o.ci), Y=r*(o.sO*cu+o.cO*su*o.ci), Z=r*su*o.si; return [X, Y*sOb+Z*cOb, -(Y*cOb-Z*sOb)]; }
-let EH=[0,0,0];
+let EH=[0,0,0], EV=[0,0,0];
+// apparent geocentric vector of a catalogued small body (scene axes, AU), same convention as the planets
+function sbApparent(i, jd, E, V, out){ const o=SB[i], o3=[0,0,0]; orbitPos(o,jd,o3);
+  let tau=Math.hypot(o3[0]-E[0],o3[1]-E[1],o3[2]-E[2])/C_AU_DAY;
+  for(let k=0;k<3;k++){ orbitPos(o,jd-tau,o3); tau=Math.hypot(o3[0]-E[0],o3[1]-E[1],o3[2]-E[2])/C_AU_DAY; } orbitPos(o,jd-tau,o3);
+  const ax=o3[0]-E[0], ay=o3[1]-E[1], az=o3[2]-E[2], L=Math.hypot(ax,ay,az);
+  // Earth at the light-departure time: E − Vτ + ½aτ² (the Sun's pull a = −k²E/|E|³), or exactly when the light time is long
+  let ex, ey, ez;
+  if(tau>0.25){ const Et=toS(A.HelioVector('Earth', A.MakeTime(jd-2451545.0-tau))); ex=Et[0]; ey=Et[1]; ez=Et[2]; }
+  else { const re=Math.hypot(E[0],E[1],E[2]), q=0.5*GK*GK/(re*re*re)*tau*tau; ex=E[0]-V[0]*tau-q*E[0]; ey=E[1]-V[1]*tau-q*E[1]; ez=E[2]-V[2]*tau-q*E[2]; }
+  const px=o3[0]-ex, py=o3[1]-ey, pz=o3[2]-ez, lp=Math.hypot(px,py,pz);
+  out[0]=px/lp*L; out[1]=py/lp*L; out[2]=pz/lp*L; return out; }
 function updateSmallBodies(t){
-  const jd=t.ut+2451545.0, eh=A.HelioVector('Earth',t); EH=toS(eh);
+  const jd=t.ut+2451545.0, es=A.HelioState('Earth',t); EH=toS(es); EV=toS({x:es.vx,y:es.vy,z:es.vz});
+  const ap=[0,0,0];
   const o3=[0,0,0], ta=tailGeo.attributes.position.array, tc=tailGeo.attributes.color.array; let tk=0;
   for(let i=0;i<NSB;i++){ const o=SB[i]; const r=orbitPos(o,jd,o3); sbHel[i*3]=o3[0]; sbHel[i*3+1]=o3[1]; sbHel[i*3+2]=o3[2]; sbR[i]=r;
-    dispPoint(o3[0]-EH[0],o3[1]-EH[1],o3[2]-EH[2],tmp); sbPos[i*3]=tmp[0]; sbPos[i*3+1]=tmp[1]; sbPos[i*3+2]=tmp[2];
+    if(o.kind===2||o.kind===3) dispPoint(o3[0]-EH[0],o3[1]-EH[1],o3[2]-EH[2],tmp); else { sbApparent(i,jd,EH,EV,ap); dispPoint(ap[0],ap[1],ap[2],tmp); }
+    sbPos[i*3]=tmp[0]; sbPos[i*3+1]=tmp[1]; sbPos[i*3+2]=tmp[2];
     if(o.kind>=4){ // tail points away from the Sun; longer when close to it
       const L = r<5 ? Math.min(.9, .55/Math.pow(Math.max(r,.3),1.4)) : 0;
       for(let seg=0;seg<4;seg++){ const f0=seg/4, f1=(seg+1)/4;
@@ -678,14 +696,26 @@ const fabSrc=[];
 // ---------- per-frame astronomy ----------
 const pos = {};
 const tmp=[0,0,0], tmp2=[0,0,0], tmp3=[0,0,0];
+// Geocentric apparent position (scene axes, AU): direction includes light time and aberration
+// (body at t−τ minus Earth at t−τ, to first order); length is the light-time distance |P(t−τ) − E(t)|.
+function geoApparent(key, t){
+  let app=A.GeoVector(key, t, true);
+  if(key==='Moon'){ const d0=Math.hypot(app.x,app.y,app.z); app=A.GeoVector('Moon', A.MakeTime(t.ut - d0/C_AU_DAY), true); } // the library omits the Moon's 1.3 s light time
+  let ast;
+  if(key==='Moon'){ const es=A.HelioState('Earth',t), tau=Math.hypot(app.x,app.y,app.z)/C_AU_DAY;   // barycentric light-time range, as JPL defines it
+    ast={x:app.x-es.vx*tau, y:app.y-es.vy*tau, z:app.z-es.vz*tau}; }
+  else ast=A.GeoVector(key, t, false);
+  const L=Math.hypot(ast.x,ast.y,ast.z), a=toS(app), la=Math.hypot(...a), u=[a[0]/la,a[1]/la,a[2]/la];
+  return {p:[u[0]*L,u[1]*L,u[2]*L], d:L, u};
+}
 function compute(t){
-  for(const b of [...BODIES, ...OUTER]){ const p=toS(A.GeoVector(b.key, t, true)); const d=Math.hypot(...p); pos[b.key]={p, d, u:[p[0]/d,p[1]/d,p[2]/d]}; }
+  for(const b of [...BODIES, ...OUTER]){ pos[b.key]=geoApparent(b.key, t); }
   sunNow = pos.Sun.p; qsNow = pos.Sun.u.map(x=>x*R_SUN);
   anchors = [{p:[0,0,0], d:[0,0,0], s2:0.004**2}];
   for(const b of BODIES){ const P=pos[b.key], gr=g(P.d);
     anchors.push({p:P.p, s2:(0.12*P.d+0.004)**2, d:P.u.map(x=>x*(b.R-gr))}); }
 }
-function sampleAt(key, ut){ const t=A.MakeTime(ut); return { p: key==='EarthT' ? null : toS(A.GeoVector(key,t,true)), s: toS(A.GeoVector('Sun',t,true)) }; }
+function sampleAt(key, ut){ const t=A.MakeTime(ut); return { p: key==='EarthT' ? null : geoApparent(key,t).p, s: geoApparent('Sun',t).p }; }
 function updateTrail(T, key, span, ut){
   const N=240, step=span/N;
   if(T.last===null || ut < T.last-step || ut - T.last > span){ T.pts=[]; for(let i=N-1;i>=0;i--) T.pts.push(sampleAt(key, ut-i*step)); T.last=ut; }
@@ -752,7 +782,7 @@ const starLbls=SKY.names.map(([i,name])=>({pos:new THREE.Vector3(sDir[i*3],sDir[
 const V=new THREE.Vector3(), W=new THREE.Vector3(), EW=new THREE.Vector3();
 let W_=0,H_=0;
 function place(el, world, show=true){
-  let vis=show, x=0, y=0;
+  let vis=show && (state.intro===null || el._introOK===true), x=0, y=0;
   if(vis){ V.copy(world).project(camera);
     if(V.z>1 || V.z<-1 || Math.abs(V.x)>1.1 || Math.abs(V.y)>1.1) vis=false; else { x=Math.round((V.x+1)/2*W_*2)/2; y=Math.round((1-V.y)/2*H_*2)/2; } }
   if(vis!==el._v){ el.style.display=vis?'':'none'; el._v=vis; }
@@ -1059,9 +1089,8 @@ function tick(now){
   // Earth and the spheres centred on it
   W.fromArray(eD).applyMatrix4(prec.matrixWorld); earth.position.copy(W);
   earth.scale.setScalar(es);
-  const RV = state.intro===null ? 1 : state.reveal;
-  for(const s of [...planetShells, ...elemShells]){ s.position.fromArray(eD); s.material.uniforms.uA.value=s.userData.base*state.u*RV; }
-  starShell.position.fromArray(eD); starShell.material.uniforms.uA.value=starShell.userData.base*(1-state.c);
+  for(const s of [...planetShells, ...elemShells]){ s.position.fromArray(eD); s.material.uniforms.uA.value=s.userData.base*state.u*(s.userData.iv??1); }
+  starShell.position.fromArray(eD); starShell.material.uniforms.uA.value=starShell.userData.base*(1-state.c)*(starShell.userData.iv??1);
   { const fa=(1-state.u)*(state.showShells?1:0); const on=fa>.01;
     flexShells.forEach(m=>{ m.visible=on; m.userData.cap.visible=on; m.material.uniforms.uA.value=.7*fa; m.material.uniforms.uHi.value = m.userData.key===state.sel?1:0; });
     if(on && (frame%3===0 || state.rate<.05)) updateFlex(); }
@@ -1072,7 +1101,7 @@ function tick(now){
   earthMat.uniforms.uL.value.copy(W.applyQuaternion(eInv.copy(earth.quaternion).invert()));
   muhitMats.forEach(m=>m.uniforms.uT.value=state.time); starMat.uniforms.uT.value=state.time;
   { const cd=camera.position.length(); const vis=Math.min(1,Math.max(0,(cd-R_MI)/(R_MI*1.5)));
-    MUHIT_STRATA.forEach(m=>m.material.uniforms.uIn.value=vis); muhitOuter.visible = cd>R_MI*0.9; state.far = cd>420;
+    MUHIT_STRATA.forEach(m=>{ m.material.uniforms.uIn.value=vis; m.visible=vis>.002; });   // skip the full-screen strata when they are faded out muhitOuter.visible = cd>R_MI*0.9; state.far = cd>420;
     if(state.cut && cd>R_MI*0.97 && !state.skyView){ clipPlane.normal.copy(camera.position).normalize().negate(); clipPlane.constant=0; } else clipPlane.constant=1e9; }
 
   // light paths
@@ -1111,6 +1140,7 @@ function tick(now){
   }
   bloom.strength += ((state.warpT>now?1.2:.55) - bloom.strength)*ease(3);
   { const dt2=camera.position.distanceTo(controls.target), nn=Math.min(6,Math.max(.004,dt2*.0006)); if(Math.abs(nn-camera.near)>camera.near*.15){ camera.near=nn; camera.updateProjectionMatrix(); } }
+  if(state.intro!==null) applyIntroVis(t);
   composer.render();
 
   // labels
@@ -1133,7 +1163,7 @@ function tick(now){
       if(V.z>1){ x2=x1+(x1-x2)*-50; y2=y1+(y1-y2)*-50; }
       rulerLine.setAttribute('x1',x1); rulerLine.setAttribute('y1',y1); rulerLine.setAttribute('x2',x2); rulerLine.setAttribute('y2',y2); } }
   for(const s of elemLbls){ W.copy(dir).multiplyScalar(s.R*es).add(EW); place(s.el,W,nameOK && state.showElem); }
-  for(const z of zodLabels){ W.copy(z.pos).applyMatrix4(prec.matrixWorld); place(z.el,W,state.showZod && !state.far); }
+  for(const z of zodLabels){ W.copy(z.pos).applyMatrix4(prec.matrixWorld); place(z.el,W,(state.intro!==null || state.showZod) && !state.far); }
   for(const s of signLabels){ W.copy(s.pos).applyMatrix4(sky.matrixWorld); place(s.el,W,state.showSigns && !state.far); }
   for(const s of starLbls){ W.copy(s.pos).applyMatrix4(prec.matrixWorld); place(s.el,W,state.showStarNames); }
 
@@ -1252,57 +1282,137 @@ $('snd').onclick=()=>{ const on=$('snd').getAttribute('aria-pressed')!=='true'; 
 // --- opening state: the whole of al-Muhit behind the title
 applyHaq(haqOn);
 body.classList.add('splash');
-// ---- intro: plain starfield, a blue dot, a dive onto Earth, then the model appears around it
-// Layer 1 holds what the intro shows before the reveal: the stars and the Earth.
-starPts.layers.enable(1); earth.traverse(o=>o.layers.enable(1));
+// ---- intro: a scroll-driven tour. Earth first, then each sphere in turn, then the scale of everything,
+// then al-Muhit, then the way in. One beat per screen-and-a-bit of scrolling, so every line can be read.
 const dotSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex('rgba(220,235,255,1)','rgba(120,170,255,.55)','rgba(80,120,255,0)'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
-dotSprite.layers.set(1); scene.add(dotSprite);
-state.intro=0; state.introP=0; state.reveal=0; state.playing=false; $('t-play').textContent='Play';
-camera.layers.set(1); controls.enabled=false;
-const introEl=$('intro'), beats=[...introEl.querySelectorAll('.beat')];
-let introDir=null;
+scene.add(dotSprite);
+state.intro=0; state.introP=0; state.playing=false; $('t-play').textContent='Play';
+controls.enabled=false;
+const introEl=$('intro'), stageEl=introEl.querySelector('.stage');
 const smooth=(a,b,x)=>{ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); };
+const AU_M=1.495978707e11, MARBLE_KM=12742;               // Earth's diameter pictured as a 1 cm marble
+const fmtMarble = km => { const cm=km/MARBLE_KM; if(cm<100) return `${cm<10?cm.toFixed(1):Math.round(cm)} cm`;
+  const m=cm/100; if(m<1000) return `${m<10?m.toFixed(1):Math.round(m)} m`; const k=m/1000; return `${k<10?k.toFixed(1):Math.round(k).toLocaleString()} km`; };
+const fmtLight = s => s<60? `${s.toFixed(1)} seconds` : s<3600? `${(s/60).toFixed(1)} minutes` : `${(s/3600).toFixed(2)} hours`;
+const liveChip = key => { const au=pos[key].d, km=au*AU_KM;
+  const dist = au<.01 ? `${Math.round(km).toLocaleString()} km` : `${au.toFixed(2)} AU, ${Math.round(km/1e6).toLocaleString()} million km,`;
+  return `${dist} from Earth today. Light takes ${fmtLight(km/299792.458)}.<br>On the marble scale: ${fmtMarble(km)} away.`; };
+const BEATS=[
+ {pos:'mid', html:'<h1>The universe, through a different lens</h1>', d:34},
+ {pos:'mid', html:'<p>Somewhere in this darkness is a small blue point of light.</p>', d:34},
+ {pos:'top', key:'earth', html:'<p>Earth. In this model it holds still, at the centre of everything.</p>', chip:()=>'12,742 km across. Picture it as a marble one centimetre wide; we will keep that scale all the way out.', d:2.1, m:()=>6.371e6},
+ {pos:'top', body:'Moon', html:'<p>The first sphere carries the Moon.</p>', chip:()=>liveChip('Moon'), d:6.6},
+ {pos:'top', body:'Mercury', html:'<p>The second carries Mercury, the swiftest of the planets.</p>', chip:()=>liveChip('Mercury'), d:10.6},
+ {pos:'top', body:'Venus', html:'<p>The third carries Venus, which waxes and wanes like the Moon.</p>', chip:()=>liveChip('Venus'), d:14.6},
+ {pos:'top', body:'Sun', html:'<p>The fourth sphere carries the Sun, in the middle of the seven.</p>', chip:()=>liveChip('Sun'), d:19},
+ {pos:'top', body:'Mars', html:'<p>The fifth carries Mars.</p>', chip:()=>liveChip('Mars'), d:23.5},
+ {pos:'top', body:'Jupiter', html:'<p>The sixth carries Jupiter and its four great moons. Between Mars and Jupiter drift thousands of asteroids, and comets cross on their measured orbits.</p>', chip:()=>liveChip('Jupiter'), d:28},
+ {pos:'top', body:'Saturn', html:'<p>The seventh carries Saturn, the last of the planets.</p>', chip:()=>liveChip('Saturn'), d:32.5},
+ {pos:'top', key:'stars', html:'<p>The eighth sphere holds the fixed stars and the twelve signs. Every star sits at its measured distance, so the figures of the zodiac stretch deep into space.</p>', chip:()=>'Nearest star, Proxima Centauri: 4.24 light-years.<br>On the marble scale: 31,500 km, most of the way around the real Earth.', d:105, m:()=>4.0175e16},
+ {pos:'top', key:'galaxies', html:'<p>Beyond the stars lie our galaxy and ten thousand others, each placed where its redshift puts it.</p>', chip:()=>'Andromeda: 2.5 million light-years.<br>On the marble scale: 124 times the distance from the Earth to the Sun.', d:172, m:()=>2.365e22},
+ {pos:'top', key:'edge', html:'<p>Then the edge of everything that can be seen. Light from here set out 13.8 billion years ago, soon after the Big Bang.</p>', chip:()=>'46.3 billion light-years away today.<br>On the marble scale: 36 light-years.', d:245, m:()=>4.38e26},
+ {pos:'top', key:'log', html:'<p>All of this spans twenty powers of ten. The map is logarithmic: each ten-fold step outward takes the same space, which is the only way Earth and the farthest galaxies fit on one screen.</p>', chip:()=>'From 10<sup>7</sup> metres to 10<sup>27</sup> metres, one equal step for each power of ten.', d:262, m:()=>4.38e26},
+ {pos:'top', key:'muhit', html:'<p>Around all of it turns the ninth sphere, al-Falak al-Muhit. It begins where observation ends. Here its outer face lies a thousand powers of ten beyond the edge, drawn on the same scale.</p>', chip:()=>'10<sup>1000</sup> × 46.3 billion light-years. Nothing beyond the edge can be observed, so no measurement confirms it or rules it out.', d:VIEW_MUHIT, m:()=>1e30},
+ {pos:'mid', key:'enter', html:'<p>Nine spheres. One sky. Every measurement unchanged.</p><div class="ctas"><button class="enter" id="intro-enter">Enter the model</button></div><div class="lnks"><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>', d:30},
+];
+const NB=BEATS.length;
+introEl.querySelector('.track').style.height=(NB*118)+'vh';
+const beatEls=BEATS.map(b=>{ const el=document.createElement('div'); el.className='beat '+b.pos;
+  el.innerHTML=`<div class="btxt">${b.html}</div>${b.chip?'<div class="chip"></div>':''}`; stageEl.appendChild(el); return el; });
+const bIndex = key => BEATS.findIndex(b=>b.body===key || b.key===key);
+// the scale ruler: powers of ten from Earth's radius to the edge of the observable universe, then al-Muhit
+const RL_MIN=6.5, RL_MAX=27, RL_W=.86;
+const lx = L => L<=RL_MAX ? Math.max(0,(L-RL_MIN)/(RL_MAX-RL_MIN))*RL_W : RL_W+.04+Math.min(1,(L-RL_MAX)/3)*(1-RL_W-.06);
+const irEl=document.createElement('div'); irEl.className='iruler'; irEl.setAttribute('aria-hidden','true');
+irEl.innerHTML='<div class="ir-read"><b id="ir-num"></b><span id="ir-txt"></span></div><div class="ir-track" id="ir-track"><div class="ir-axis"></div><div class="ir-mseg"></div><div class="ir-brk">//</div><div class="ir-mk" id="ir-mk"></div></div>';
+introEl.appendChild(irEl);
+const irTrack=irEl.querySelector('#ir-track'), irLms=[];
+{ const add=(cls,x,html)=>{ const e=document.createElement('div'); e.className=cls; e.style.left=(x*100)+'%'; if(html) e.innerHTML=html; irTrack.appendChild(e); return e; };
+  for(let p=7;p<=27;p++){ add('ir-tk'+(p%5===0?' major':''),lx(p)); if(p%5===0) add('ir-tl',lx(p),`10<sup>${p}</sup> m`); }
+  [['Earth',6.371e6],['Moon',3.844e8],['Sun',1.496e11],['Saturn',1.43e12],['Proxima',4.0175e16],['Galactic centre',2.5e20],['Andromeda',2.365e22],['Edge',4.38e26]]
+    .forEach(([nm,m],k)=>{ const L=Math.log10(m); const e=add('ir-lm'+(k%2?' hi':''),lx(L),nm); irLms.push({e,L}); });
+  irLms.push({e:add('ir-lm muhit',lx(30),'al-Muhit'),L:29.5}); }
+const beatL = k => { const b=BEATS[k]; if(b.body) return Math.log10(pos[b.body].d*AU_M); if(b.m) return Math.log10(b.m()); return null; };
+const humanM = m => m<1e9 ? `${Math.round(m/1000).toLocaleString()} km` : m<1e14 ? `${(m/AU_M).toFixed(m<1.5e12?2:1)} AU` : fmtLy(m/9.4607e15);
+let introDir=null, chipsDone=false;
 introEl.addEventListener('scroll',()=>{ const max=introEl.scrollHeight-introEl.clientHeight; state.introP=max>0? introEl.scrollTop/max : 0; },{passive:true});
-function introBeats(p){ for(const b of beats){ const a=+b.dataset.in, o=+b.dataset.out, w=.035;
-    const v=Math.min(smooth(a,a+w,p), 1-smooth(o-w,o,p)); b.style.opacity=v; b.style.transform=`translateY(${(1-v)*14}px) scale(${.985+.015*v})`; b.style.filter=`blur(${(1-v)*6}px)`; }
-  $('intro-hint').style.opacity = p<.02 ? 1 : Math.max(0,1-(p-.02)*12); }
 function introCamera(dt){
-  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*5);
-  introBeats(p);
+  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*4);
+  if(!chipsDone){ BEATS.forEach((b,k)=>{ if(b.chip) beatEls[k].querySelector('.chip').innerHTML=b.chip(); }); chipsDone=true; }
   if(!introDir){ // look at Earth's sunlit side, a little from above
     const sw=new THREE.Vector3(...sunNow).applyMatrix3(new THREE.Matrix3().setFromMatrix4(prec.matrixWorld)).normalize();
     introDir=sw.clone().multiplyScalar(.75).add(new THREE.Vector3(0,.35,0)).add(new THREE.Vector3().crossVectors(sw,new THREE.Vector3(0,1,0)).normalize().multiplyScalar(.55)).normalize(); }
-  // distances: rest among the stars, dive to Earth, hold, pull back to the planets
-  const dive=smooth(.27,.55,p), back=smooth(.72,.92,p);
-  const dNear=2.1, dFar=34, dEnd=30;
-  let d = dFar*Math.pow(dNear/dFar, dive); d = d + (dEnd-d)*back*back;
-  const dir=introDir.clone().lerp(HOME.clone().normalize(), back).normalize();
-  const drift=state.time*.03*(1-back); dir.applyAxisAngle(new THREE.Vector3(0,1,0), drift*(.3+.7*smooth(.5,.7,p)));
+  const x=p*NB, i=Math.min(NB-1,Math.floor(x)), s=Math.min(1,x-i);
+  // text: each beat fades in, holds for most of its scroll, then fades out
+  beatEls.forEach((el,k)=>{ const lx0=x-k; let v = k===0 ? 1-smooth(.78,.97,lx0) : k===NB-1 ? smooth(.05,.22,lx0) : Math.min(smooth(.05,.22,lx0), 1-smooth(.78,.97,lx0));
+    v=Math.max(0,v); el.style.opacity=v; el.style.visibility=v<.01?'hidden':''; el.style.transform=`translateY(${(1-v)*12}px)`; });
+  $('intro-hint').style.opacity = p<.005 ? 1 : Math.max(0,1-(p-.005)*60);
+  // camera: during the first half of each beat, move (in log distance) from the previous beat's view to this one
+  const d0=BEATS[Math.max(0,i-1)].d, d1=BEATS[i].d, e=smooth(0,.55,s), d=d0*Math.pow(d1/d0,e);
+  const toTop=smooth(3/NB,3.5/NB,p);
+  const dir=introDir.clone().lerp(HOME.clone().normalize(), toTop).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), state.time*.02);
   camera.position.copy(dir.multiplyScalar(d)); camera.lookAt(0,0,0); controls.target.set(0,0,0);
-  // the blue point: visible from afar, fading as Earth resolves
-  earth.scale.setScalar(.04+.96*smooth(.3,.53,p));
-  dotSprite.scale.setScalar(d*.03); dotSprite.material.opacity=(.35+.65*smooth(.12,.22,p))*(1-smooth(.4,.5,p));
-  // warp streaks and glow during the dive
-  const diving = p>.3 && p<.52 && Math.abs(state.introP-state.intro)>.002; warpEl.classList.toggle('on', diving); if(diving) state.warpT=performance.now()+200;
-  // the reveal: everything else appears around Earth
-  const rv=smooth(.7,.8,p); state.reveal=rv;
-  if(rv>0.01){ camera.layers.enable(0); body.classList.toggle('reveal', rv>.5); } else { camera.layers.set(1); body.classList.remove('reveal'); }
-  if(p>.997) enterModel();
+  earth.scale.setScalar(.04+.96*smooth(2/NB,2.45/NB,p));
+  dotSprite.scale.setScalar(d*.03); dotSprite.material.opacity=smooth(1.05/NB,1.25/NB,p)*(1-smooth(2.1/NB,2.4/NB,p)); dotSprite.visible=dotSprite.material.opacity>.002;
+  const moving=Math.abs(state.introP-state.intro)>.0015, big=Math.max(d1/d0,d0/d1)>2.5;
+  warpEl.classList.toggle('on', moving && big && s<.55); if(moving && big && s<.55) state.warpT=performance.now()+200;
+  // the scale ruler
+  const op=smooth(2.05/NB,2.35/NB,p)*(1-smooth((NB-1)/NB,(NB-.7)/NB,p)); irEl.style.opacity=op;
+  if(op>0){ let L;
+    if(BEATS[i].key==='log'){ L=6.8+(Math.log10(4.38e26)-6.8)*smooth(.12,.8,s); }
+    else { const L1=beatL(i), L0=beatL(Math.max(0,i-1)) ?? L1; L = L1===null ? 6.8 : L0+(L1-L0)*e; }
+    $('ir-mk').style.left=(lx(L)*100)+'%';
+    irLms.forEach(o=>o.e.classList.toggle('on', L>=o.L-.02));
+    if(L<=27.05){ $('ir-num').innerHTML=`10<sup>${L.toFixed(1)}</sup> m`; $('ir-txt').textContent=humanM(Math.pow(10,L)); }
+    else { $('ir-num').innerHTML='edge × 10<sup>1000</sup>'; $('ir-txt').textContent='the outer face of al-Muhit'; } }
+}
+// what the tour shows at each moment: each sphere and its contents appear in turn
+const appear = k => smooth((k+.08)/NB,(k+.5)/NB,state.intro);
+function applyIntroVis(t){
+  BODIES.forEach((b,k)=>{ const f=appear(bIndex(b.key)); b.mesh.visible=f>.001; b.mesh.scale.setScalar(Math.max(.001,f));
+    planetShells[k].userData.iv=f; b.trailLine.visible=f>.98; b.lbl._introOK=f>.6; });
+  sunGlow.visible=BMAP.Sun.mesh.visible; sunGlow.material.opacity=appear(bIndex('Sun'));
+  const fJ=appear(bIndex('Jupiter')), fS=appear(bIndex('Saturn')), fM=appear(bIndex('Mars'));
+  moonGroups[0].visible=fJ>.5; moonGroups[1].visible=fS>.5; moonGroups[2].visible=fM>.5;   // Jupiter, Saturn, Mars
+  if(fJ>.02 && !smallBodies.visible) updateSmallBodies(t);
+  smallBodies.visible=fJ>.02; smallBodies.material.uniforms.uFade.value=fJ; tails.visible=fJ>.5; cometOrbits.forEach(c=>c.ln.visible=false);
+  const fSt=appear(bIndex('stars')); starShell.userData.iv=fSt; zodGroup.visible=fSt>.02; zodLabels.forEach(z=>z.el._introOK=fSt>.6);
+  const fG=appear(bIndex('galaxies')); for(const o of [milky,galaxies,objects]){ o.visible=fG>.01; o.material.uniforms.uFade.value=fG; }
+  const fE=appear(bIndex('edge')); for(const o of [deep,landmarks]){ o.visible=fE>.01; o.material.uniforms.uFade.value=fE; }
+  cmb.visible=fE>.3; horizon.visible=fE>.3;
+  muhitGroup.visible=appear(bIndex('muhit'))>.05;
+  for(const o of [fabric, sightLine, sunLine, chordLine, ...dispLines, signGroup, earthTrail.line, ...elemShells]) o.visible=false;
+  flexShells.forEach(m=>{ m.visible=false; m.userData.cap.visible=false; }); OUTER.forEach(o=>o.mesh.visible=false);
 }
 function enterModel(){ if(state.intro===null) return; state.intro=null; warpEl.classList.remove('on');
-  introEl.classList.add('gone'); body.classList.remove('splash','reveal'); camera.layers.enableAll(); dotSprite.visible=false;
-  camera.position.setLength(Math.max(12, camera.position.length())); controls.target.set(0,0,0); controls.enabled=true;
-  state.playing=true; $('t-play').textContent='Pause'; }
+  introEl.classList.add('gone'); body.classList.remove('splash'); dotSprite.visible=false;
+  BODIES.forEach(b=>{ b.mesh.visible=true; b.mesh.scale.setScalar(1); b.lbl._introOK=true; }); sunGlow.visible=true; sunGlow.material.opacity=1;
+  planetShells.forEach(sh=>sh.userData.iv=1); starShell.userData.iv=1;
+  pointMats.forEach(m=>{ if(m.uniforms.uFade) m.uniforms.uFade.value=1; });
+  muhitGroup.visible=true; cmb.visible=true; horizon.visible=true;
+  document.querySelectorAll('#left .tog input').forEach(inp=>inp.dispatchEvent(new Event('change')));   // back to the viewer's layer choices
+  controls.target.set(0,0,0); controls.enabled=true;
+  state.playing=true; $('t-play').textContent='Pause';
+  if(camera.position.length()>60) warpTo(30); }
 $('intro-enter').onclick=enterModel; $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
+$('intro-calc').onclick=()=>{ enterModel(); openCalc(); };
 camera.position.set(0,0,34);
-// ---- powers-of-ten zoom: each wheel notch = a quarter of a power of ten in viewpoint distance
+
+// ---- zoom: wheel, trackpad pinch and buttons scale the viewing distance by a constant factor,
+// so every notch looks the same at every scale (the depth gauge shows the power of ten you are at)
 const DECADE = GA*Math.LN10;
-addEventListener('wheel', e=>{ if(e.target!==canvas) return; if(state.skyView) return; e.preventDefault(); e.stopPropagation();
-  let notch = Math.max(-3, Math.min(3, e.deltaY/100)); if(e.deltaMode===1) notch*=33;
+addEventListener('wheel', e=>{
+  if(state.intro!==null || state.skyView) return;
+  if(e.target.closest && e.target.closest('.panel,#article,#calc,#intro')) return;
+  e.preventDefault(); e.stopPropagation();
+  let dy=e.deltaY; if(e.deltaMode===1) dy*=33; else if(e.deltaMode===2) dy*=400;
+  if(e.ctrlKey) dy*=4;                                   // trackpad pinch arrives as small ctrl+wheel steps
+  dy=Math.max(-300,Math.min(300,dy));
   const cur = state.zoomGoal ?? camera.position.distanceTo(controls.target);
-  let next = (state.focus || cur < 2.5) ? cur*Math.pow(1.2, notch) : Math.max(2.5, cur + notch*DECADE/4);
-  next = Math.max(controls.minDistance, Math.min(controls.maxDistance, next)); state.zoomGoal=next; state.camDir=null;
-  if(!state.focus && next>2.5 && Math.abs(next-cur)>DECADE*3) warpFx(); }, {passive:false, capture:true});
+  const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, cur*Math.exp(dy*0.0017)));
+  state.zoomGoal=next; state.camDir=null;
+  if(Math.max(next/cur,cur/next)>2.5) warpFx(); }, {passive:false, capture:true});
+$('z-in').onclick=()=>dolly(.55); $('z-out').onclick=()=>dolly(1.8);
 // ---- the depth gauge (log scale along the bottom)
 const GAUGE_A=.80, GAUGE_B=.965, CD_MAX=VIEW_MUHIT*1.2;
 const cdToX = cd => cd<=R_EDGE ? Math.max(0,(cd-RE)/(R_EDGE-RE))*GAUGE_A : cd<=R_MO ? GAUGE_A+(cd-R_EDGE)/(R_MO-R_EDGE)*(GAUGE_B-GAUGE_A) : Math.min(1, GAUGE_B+(cd-R_MO)/(CD_MAX-R_MO)*(1-GAUGE_B));
@@ -1331,6 +1441,187 @@ function closeArticle(){ $('article').hidden=true; }
 $('open-article').onclick=openArticle; $('intro-read').onclick=openArticle; $('art-x').onclick=closeArticle;
 $('article').addEventListener('click',e=>{ if(e.target.id==='article') closeArticle(); });
 addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('article').hidden){ closeArticle(); e.stopImmediatePropagation(); } }, true);
+// ================= calculator: this model against the heliocentric calculation =================
+// Column 1 ("this model") places the object in the Earth-centred scene exactly as the scene does, then reads the
+// answer back out of the scene geometry. Column 2 ("heliocentric") never touches the scene: it takes Sun-centred
+// positions, applies light time and aberration, and subtracts Earth's position. Both use the same planetary theory
+// (VSOP87 via Astronomy Engine), so agreement shows that the Earth-centred geometry loses no information.
+const ginv = r => GB*(Math.exp((r-RE)/GA)-1);
+const vsub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], vadd=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], vlen=a=>Math.hypot(a[0],a[1],a[2]);
+const vsc=(a,k)=>[a[0]*k,a[1]*k,a[2]*k], vdot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], vunit=a=>vsc(a,1/vlen(a));
+const sToEqj = v=>[v[0], -v[2], v[1]], xyz = o=>[o.x,o.y,o.z];
+const angSec=(a,b)=>{ const cr=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; return Math.atan2(vlen(cr),vdot(a,b))/DEG*3600; };
+const CALC_OBJ=[];
+{ const HZ={Sun:'10',Moon:'301',Mercury:'199',Venus:'299',Mars:'499',Jupiter:'599',Saturn:'699'};
+  ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn'].forEach(k=>CALC_OBJ.push({type:'major',key:k,label:k,group:'Sun, Moon and planets',hz:HZ[k]}));
+  ['Io','Europa','Ganymede','Callisto'].forEach((k,i)=>CALC_OBJ.push({type:'moon',idx:i,label:`${k} (moon of Jupiter)`,group:'Moons of Jupiter',hz:String(501+i)}));
+  [...SKY.names].sort((a,b)=>a[1].localeCompare(b[1])).forEach(([i,nm])=>CALC_OBJ.push({type:'star',idx:i,label:nm,group:'Bright stars'}));
+  SB.map((o,i)=>({o,i})).filter(x=>x.o.kind>=4 && x.o.name).sort((a,b)=>(FAMOUS.some(f=>b.o.name.includes(f))-FAMOUS.some(f=>a.o.name.includes(f)))||a.o.name.localeCompare(b.o.name))
+    .forEach(({o,i})=>CALC_OBJ.push({type:'sb',idx:i,label:o.name,group:'Comets and interstellar objects'}));
+  SB.map((o,i)=>({o,i})).filter(x=>(x.o.kind===0||x.o.kind===1) && x.o.name).sort((a,b)=>a.o.H-b.o.H).slice(0,80)
+    .forEach(({o,i})=>CALC_OBJ.push({type:'sb',idx:i,label:o.name,group:'Asteroids and dwarf planets',hz:`${o.name};`})); }
+const SUNOBJ=CALC_OBJ[0];
+// --- this model -------------------------------------------------------------------------------------------
+// The geocentric vector the scene itself uses for an object at time t (scene axes, AU). Call after compute(t).
+function sceneVector(obj, t){
+  if(obj.type==='major') return pos[obj.key].p;
+  if(obj.type==='moon'){ // the moon rides on Jupiter's sphere; its own light time differs from Jupiter's by a few seconds
+    const Jast=toS(A.GeoVector('Jupiter',t,false)), Japp=toS(A.GeoVector('Jupiter',t,true)), tJ=vlen(Jast)/C_AU_DAY;
+    let tm=tJ, off; for(let k=0;k<3;k++){ const jm=A.JupiterMoons(A.MakeTime(t.ut-tm)); off=toS([jm.io,jm.europa,jm.ganymede,jm.callisto][obj.idx]); tm=vlen(vadd(Jast,off))/C_AU_DAY; }
+    const eS=A.HelioState('Earth',t), jS=A.HelioState('Jupiter',t), dv=vsub(toS({x:eS.vx,y:eS.vy,z:eS.vz}), toS({x:jS.vx,y:jS.vy,z:jS.vz}));
+    const app=vadd(vadd(Japp,off), vsc(dv,tm-tJ)), ast=vadd(vadd(Jast,off), vsc(toS({x:jS.vx,y:jS.vy,z:jS.vz}),-(tm-tJ)));
+    return vsc(vunit(app), vlen(ast)); }
+  const es=A.HelioState('Earth',t), E=toS(es), Vd=toS({x:es.vx,y:es.vy,z:es.vz});
+  if(obj.type==='sb') return sbApparent(obj.idx, t.ut+2451545.0, E, Vd, [0,0,0]);
+  // a star on the eighth sphere, with the sphere's yearly wobble at true size: parallax and aberration
+  const i=obj.idx, st=SKY.s[i], d0=radecS(st[0],st[1]), V=vsc(Vd,1/C_AU_DAY), par=st[4]>0 ? 1/(st[4]*206264.806) : 0;   // double precision, not the GPU's float buffer
+  const ep=vsub(E,vsc(d0,vdot(E,d0))), d1=vunit(vsub(d0,vsc(ep,par))), vp=vsub(V,vsc(d1,vdot(V,d1)));
+  const dir=vunit(vadd(d1,vp)); return vsc(dir, par>0 ? vlen(vsub(vsc(d0,1/par),E)) : 1e15);
+}
+// Read an answer back from the scene geometry.
+//  Flexing spheres: the displayed point gives the direction, and its radius inverts the log map to give distance.
+//  Round spheres: depth is rank, so the observed direction is that of the light path where it leaves Earth, and
+//  the distance is the length of that light path measured in the map's own metric.
+function modelRead(xS, geom){ const su=state.u, sc=state.c; state.c=0; let dir, dist;
+  if(geom==='flex'){ state.u=0; const D=dispPoint(xS[0],xS[1],xS[2],[0,0,0]); dir=vunit(D); dist=ginv(vlen(D)); }
+  else { state.u=1; const e=1e-7/vlen(xS), D=dispPoint(xS[0]*e,xS[1]*e,xS[2]*e,[0,0,0]); dir=vunit(D);   // a step of 1e-7 AU along the path
+    let L=0, prev=[0,0,0]; for(let k=1;k<=64;k++){ const q=vsc(xS,k/64); L+=vlen(vsub(q,prev)); prev=q; } dist=L; }
+  state.u=su; state.c=sc; return {dir:sToEqj(dir), dist};
+}
+function withTime(t, fn){ compute(t); try { return fn(); } finally { compute(A.MakeTime(state.ut)); } }
+const modelAt = (obj,t,geom) => { const r=modelRead(sceneVector(obj,t), obj.type==='star'?'flex':geom);
+  if(obj.type==='star' && !(SKY.s[obj.idx][4]>0)) r.dist=Infinity; return r; };
+const modelVector = (obj,t,geom) => withTime(t, ()=>modelAt(obj,t,geom));
+// --- heliocentric -----------------------------------------------------------------------------------------
+function helioPos(obj, t){
+  if(obj.type==='major') return obj.key==='Sun' ? [0,0,0] : xyz(A.HelioVector(obj.key,t));
+  if(obj.type==='moon'){ const jm=A.JupiterMoons(t); return vadd(xyz(A.HelioVector('Jupiter',t)), xyz([jm.io,jm.europa,jm.ganymede,jm.callisto][obj.idx])); }
+  const o3=[0,0,0]; orbitPos(SB[obj.idx], t.ut+2451545.0, o3); return sToEqj(o3);
+}
+function helioRead(obj, t){
+  if(obj.type==='star'){ const st=SKY.s[obj.idx], u0=radec(st[0],st[1]), par=st[4]>0 ? 1/(st[4]*206264.806) : 0, es=A.HelioState('Earth',t), E=[es.x,es.y,es.z], V=vsc([es.vx,es.vy,es.vz],1/C_AU_DAY);
+    const rel = par>0 ? vsub(vsc(u0,1/par),E) : u0, u=vunit(rel);
+    return {dir:vunit(vadd(u, vsub(V, vsc(u,vdot(u,V))))), dist: par>0 ? vlen(rel) : Infinity}; }
+  let tau=0, app, ast, P; const E0=xyz(A.HelioVector('Earth',t));
+  for(let k=0;k<5;k++){ const tt=A.MakeTime(t.ut-tau); P=helioPos(obj,tt); ast=vsub(P,E0); app=vsub(P,xyz(A.HelioVector('Earth',tt))); tau=vlen(ast)/C_AU_DAY; }
+  return {dir:vunit(app), dist:vlen(ast), P, E:E0};
+}
+// --- conversions and formatting ---------------------------------------------------------------------------
+const toDate=(dir,t)=>{ const e=A.EquatorFromVector(A.RotateVector(A.Rotation_EQJ_EQD(t), new A.Vector(dir[0],dir[1],dir[2],t))); return {ra:e.ra, dec:e.dec}; };
+const toJ2000=(dir,t)=>{ const e=A.EquatorFromVector(new A.Vector(dir[0],dir[1],dir[2],t)); return {ra:e.ra, dec:e.dec}; };
+function horizonOf(dir, dist, t, obs){ let v=vsc(dir, isFinite(dist)? dist : 1e12); v=vsub(v, xyz(A.ObserverVector(t,obs,false)));
+  const d=toDate(vunit(v),t), h=A.Horizon(t,obs,d.ra,d.dec,'normal'); return {alt:h.altitude, az:h.azimuth}; }
+const fRA=h=>{ h=((h%24)+24)%24; let H=Math.floor(h), mm=(h-H)*60, M=Math.floor(mm), S=(mm-M)*60; if(S>=59.9995){S=0;M++;} if(M>=60){M=0;H=(H+1)%24;}
+  return `${String(H).padStart(2,'0')}h ${String(M).padStart(2,'0')}m ${S.toFixed(3).padStart(6,'0')}s`; };
+const fDeg=(d,dp=2)=>{ const sg=d<0?'−':'+'; d=Math.abs(d); let D=Math.floor(d), mm=(d-D)*60, M=Math.floor(mm), S=(mm-M)*60; if(S>=60-.5*10**-dp){S=0;M++;} if(M>=60){M=0;D++;}
+  return `${sg}${String(D).padStart(2,'0')}° ${String(M).padStart(2,'0')}′ ${S.toFixed(dp).padStart(3+dp,'0')}″`; };
+const fDist=au=>!isFinite(au)?'not measured': au<0.01? `${(au*AU_KM).toLocaleString(undefined,{maximumFractionDigits:2})} km` : au<2e4? `${au.toFixed(8)} AU` : `${(au/LY_AU).toLocaleString(undefined,{maximumFractionDigits:4})} light-years`;
+const fSmall=as=>{ as=Math.abs(as); return as<1e-3? `${(as*1e3).toFixed(4)} mas` : as<1? `${(as*1e3).toFixed(2)} mas` : `${as.toFixed(3)}″`; };
+const fRel=(a,b)=>{ if(!isFinite(a)||!isFinite(b)) return '—'; const r=Math.abs(a-b)/b; if(r===0) return 'identical'; const km=Math.abs(a-b)*AU_KM;
+  return km<1000? `${km<1? (km*1000).toFixed(1)+' m' : km.toFixed(2)+' km'} (${r.toExponential(1)})` : r.toExponential(2); };
+const fUT=t=>t.date.toISOString().replace('T',' ').slice(0,16)+' UTC';
+const geomName={flex:'flexing spheres', round:'round spheres'};
+// --- the calculator panel ---------------------------------------------------------------------------------
+let calcBuilt=false;
+function buildCalc(){ if(calcBuilt) return; calcBuilt=true; const sel=$('c-obj'); let grp=null, og=null;
+  CALC_OBJ.forEach((o,k)=>{ if(o.group!==grp){ grp=o.group; og=document.createElement('optgroup'); og.label=grp; sel.appendChild(og); }
+    const op=document.createElement('option'); op.value=k; op.textContent=o.label; og.appendChild(op); });
+  $('calc-form').addEventListener('submit',e=>{ e.preventDefault(); runCalc(); });
+  $('c-now').onclick=()=>{ $('c-time').value=A.MakeTime(state.ut).date.toISOString().slice(0,16); runCalc(); runEvents(); };
+  $('c-ev-go').onclick=runEvents; }
+function calcTime(){ const v=$('c-time').value; const d=new Date((v.length===16?v+':00':v)+'Z'); return A.MakeTime(isNaN(d)? new Date() : d); }
+function runCalc(){
+  const obj=CALC_OBJ[+$('c-obj').value], t=calcTime(), geom=$('c-geom').value;
+  const lat=+$('c-lat').value, lon=+$('c-lon').value, obs=new A.Observer(isFinite(lat)?lat:25.2048, isFinite(lon)?lon:55.2708, 0);
+  const t0=performance.now();
+  const M=modelVector(obj,t,geom), H=helioRead(obj,t);
+  const sepAs=angSec(M.dir,H.dir);
+  const mD=toDate(M.dir,t), hD=toDate(H.dir,t), mJ=toJ2000(M.dir,t), hJ=toJ2000(H.dir,t);
+  const mH=horizonOf(M.dir,M.dist,t,obs), hH=horizonOf(H.dir,H.dist,t,obs);
+  const rows=[];
+  const dRA=(a,b,dec)=>{ let x=(a-b)*15*3600; if(x>648000) x-=1296000; if(x<-648000) x+=1296000; return x*Math.cos(dec*DEG); };
+  rows.push(['Right ascension (apparent, of date)', fRA(mD.ra), fRA(hD.ra), fSmall(dRA(mD.ra,hD.ra,hD.dec))]);
+  rows.push(['Declination (apparent, of date)', fDeg(mD.dec), fDeg(hD.dec), fSmall((mD.dec-hD.dec)*3600)]);
+  rows.push(['Direction: total angle between the two answers', '', '', `<b>${fSmall(sepAs)}</b>`]);
+  rows.push(['Distance from Earth', fDist(M.dist), fDist(H.dist), fRel(M.dist,H.dist)]);
+  if(isFinite(H.dist)) rows.push(['Light-travel time', fmtLight(M.dist*AU_KM/299792.458), fmtLight(H.dist*AU_KM/299792.458), '']);
+  if(obj.type==='star'){ rows.push(['Right ascension (J2000, astrometric)', fRA(mJ.ra), fRA(hJ.ra), fSmall(dRA(mJ.ra,hJ.ra,hJ.dec))]); rows.push(['Declination (J2000, astrometric)', fDeg(mJ.dec), fDeg(hJ.dec), fSmall((mJ.dec-hJ.dec)*3600)]); }
+  rows.push([`Altitude at ${obs.latitude.toFixed(2)}°, ${obs.longitude.toFixed(2)}°`, `${mH.alt.toFixed(4)}°`, `${hH.alt.toFixed(4)}°`, fSmall((mH.alt-hH.alt)*3600)]);
+  rows.push(['Azimuth (from north, through east)', `${mH.az.toFixed(4)}°`, `${hH.az.toFixed(4)}°`, fSmall(((mH.az-hH.az+540)%360-180)*3600)]);
+  if(obj.key!=='Sun' && obj.type!=='star'){
+    const MS=modelVector(SUNOBJ,t,geom), HS=helioRead(SUNOBJ,t);
+    const mEl=angSec(M.dir,MS.dir)/3600, hEl=angSec(H.dir,HS.dir)/3600;
+    rows.push(['Angle from the Sun (elongation)', `${mEl.toFixed(5)}°`, `${hEl.toFixed(5)}°`, fSmall((mEl-hEl)*3600)]);
+    const g=vsc(M.dir,M.dist), sv=vsc(MS.dir,MS.dist), mPh=angSec(vsc(g,-1), vsub(sv,g))/3600;
+    const hPh=angSec(vsub(H.E,H.P), vsc(H.P,-1))/3600;
+    rows.push(['Lit fraction of the disc', `${((1+Math.cos(mPh*DEG))/2*100).toFixed(4)} %`, `${((1+Math.cos(hPh*DEG))/2*100).toFixed(4)} %`, `${Math.abs(mPh-hPh).toFixed(5)}° in phase angle`]); }
+  rows.push(['Constellation', A.Constellation(mJ.ra,mJ.dec).name, A.Constellation(hJ.ra,hJ.dec).name, '']);
+  const ms=(performance.now()-t0).toFixed(0);
+  const links=[];
+  const t1=t.date.toISOString().slice(0,16).replace('T',' '), t2=new Date(t.date.getTime()+60000).toISOString().slice(0,16).replace('T',' ');
+  if(obj.hz){ const q=k=>`'${k}'`; const url='https://ssd.jpl.nasa.gov/api/horizons.api?'+[['format','text'],['COMMAND',q(obj.hz)],['OBJ_DATA',q('NO')],['MAKE_EPHEM',q('YES')],['EPHEM_TYPE',q('OBSERVER')],['CENTER',q('500@399')],['START_TIME',q(t1)],['STOP_TIME',q(t2)],['STEP_SIZE',q('1 m')],['QUANTITIES',q('2,20')]].map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
+    links.push(`<a href="${url}" target="_blank" rel="noopener">Check against NASA JPL Horizons</a> <span class="note">(geocentric apparent RA/Dec and range for ${t1} UT; expect agreement within about an arcminute, the accuracy of the compact planetary theory used here)</span>`); }
+  if(obj.type==='star') links.push(`<a href="https://simbad.cds.unistra.fr/simbad/sim-id?Ident=${encodeURIComponent(obj.label)}" target="_blank" rel="noopener">Look up ${obj.label} in SIMBAD</a> <span class="note">(compare the J2000 rows; proper motion since 2000 is not applied here, so fast-moving stars differ by up to a few arcseconds)</span>`);
+  if(obj.type==='sb'){ const o=SB[obj.idx]; if(o.kind>=4){ const d=new Date((o.Tp-2440587.5)*864e5); links.push(`<span class="note">Orbit: closest to the Sun on ${d.toISOString().slice(0,10)} at ${o.q.toFixed(3)} AU, eccentricity ${o.e.toFixed(4)}. Positions from published orbital elements on a pure Kepler orbit; planetary perturbations are not included.</span>`); } }
+  $('c-out').innerHTML=`<div class="tw"><table class="ctab"><thead><tr><th>${obj.label} · ${fUT(t)}</th><th>This model<br><span>${geomName[obj.type==='star'?'flex':geom]}, Earth at rest</span></th><th>Heliocentric<br><span>Sun-centred vectors</span></th><th>Difference</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">Computed in ${ms} ms. The two columns use different code paths but the same planetary theory, so agreement to milliarcseconds shows the Earth-centred geometry is an exact change of viewpoint. An independent test against observation is the comparison with NASA's ephemeris below.</p>
+    <div class="clinks">${links.map(l=>`<p>${l}</p>`).join('')}<p><button class="btn" type="button" id="c-show">Show ${obj.label} in the model at this time</button></p></div>`;
+  $('c-show').onclick=()=>{ closeCalc(); state.ut=t.ut; state.playing=false; $('t-play').textContent='Play'; if(state.cTarget>.5) setCentre('Earth');
+    if(obj.type==='major'){ select(obj.key); focusOn(obj.key); } else if(obj.type==='moon'){ select('Jupiter'); focusOn('Jupiter'); } else warpTo(obj.type==='star'?100:30);
+    toast(`${obj.label}: RA ${fRA(mD.ra)}, Dec ${fDeg(mD.dec,1)} · ${fDist(M.dist)}`, 6000); };
+}
+// --- upcoming events, each checked in this model --------------------------------------------------------
+function eventsFrom(t0, geom){
+  const out=[], O=key=>CALC_OBJ.find(o=>o.key===key);
+  const lonAt=(key,t)=>{ const m=modelAt(O(key),t,geom); return A.Ecliptic(new A.Vector(m.dir[0],m.dir[1],m.dir[2],t)).elon; };
+  const dl=(a,b)=>((a-b)%360+540)%360-180, norm=a=>((a%360)+360)%360;
+  const sepAt=(a,b,t)=>angSec(modelAt(O(a),t,geom).dir, modelAt(O(b),t,geom).dir)/3600;
+  const add=(name,t,body,fn,rate)=>{ const r=withTime(t,fn); out.push({name,t,body,check:r[0],ok:r[1],rate}); };
+  const nm=A.SearchMoonPhase(0,t0,40); add('New Moon', nm, 'Moon', ()=>{ const d=dl(lonAt('Moon',nm),lonAt('Sun',nm)); return [`Moon − Sun longitude in this model: ${d.toFixed(4)}°`, Math.abs(d)<.01]; });
+  const fm=A.SearchMoonPhase(180,t0,40); add('Full Moon', fm, 'Moon', ()=>{ const d=Math.abs(dl(lonAt('Moon',fm),lonAt('Sun',fm))); return [`Moon − Sun longitude in this model: ${d.toFixed(4)}°`, Math.abs(d-180)<.01]; });
+  const se=A.SearchGlobalSolarEclipse(t0); add(`Solar eclipse (${se.kind})`, se.peak, 'Sun', ()=>{ const m=modelAt(O('Moon'),se.peak,geom), s=modelAt(O('Sun'),se.peak,geom), sp=angSec(m.dir,s.dir)/3600;
+    const km=m.dist*AU_KM, ks=s.dist*AU_KM, lim=(Math.asin(6378.137/km)+Math.asin(695700/ks)+Math.asin(1737.4/km))/DEG;
+    return [`Sun–Moon separation from Earth's centre in this model: ${sp.toFixed(3)}°, inside the ${lim.toFixed(3)}° needed for an eclipse somewhere on Earth`, sp<lim]; }, 0.000694444);
+  const le=A.SearchLunarEclipse(t0); add(`Lunar eclipse (${le.kind})`, le.peak, 'Moon', ()=>{ const m=modelAt(O('Moon'),le.peak,geom), s=modelAt(O('Sun'),le.peak,geom), sp=180-angSec(m.dir,s.dir)/3600;
+    const km=m.dist*AU_KM, ks=s.dist*AU_KM, pen=1.02*(Math.asin(6378.137/km)+Math.asin(6378.137/ks)+Math.asin(695700/ks))/DEG+Math.asin(1737.4/km)/DEG;
+    return [`Moon's distance from the point opposite the Sun in this model: ${sp.toFixed(3)}°, inside Earth's shadow (${pen.toFixed(3)}°)`, sp<pen]; }, 0.000694444);
+  const y=t0.date.getUTCFullYear();
+  [A.Seasons(y),A.Seasons(y+1)].flatMap(S=>[[S.mar_equinox,'March equinox',0],[S.jun_solstice,'June solstice',90],[S.sep_equinox,'September equinox',180],[S.dec_solstice,'December solstice',270]])
+    .filter(x=>x[0].ut>t0.ut).slice(0,2).forEach(([t,nm,L])=>add(nm, t, 'Sun', ()=>{ const l=norm(lonAt('Sun',t)); return [`Sun's ecliptic longitude in this model: ${l.toFixed(4)}° (defined as ${L}°)`, Math.abs(dl(l,L))<.01]; }));
+  for(const b of ['Mercury','Venus']){ const e=A.SearchMaxElongation(b,t0); add(`${b} at greatest ${e.visibility} elongation`, e.time, b, ()=>{ const el=sepAt(b,'Sun',e.time); return [`Angle from the Sun in this model: ${el.toFixed(4)}° (ephemeris: ${e.elongation.toFixed(4)}°)`, Math.abs(el-e.elongation)<.01]; }); }
+  for(const b of ['Mars','Jupiter','Saturn']){ const t=A.SearchRelativeLongitude(b,0,t0); add(`${b} at opposition`, t, b, ()=>{ const d=Math.abs(dl(lonAt(b,t),lonAt('Sun',t))); return [`${b} − Sun longitude in this model: ${d.toFixed(3)}°`, Math.abs(d-180)<.05]; }); }
+  for(const b of ['Mercury','Venus']){ const tr=A.SearchTransit(b,t0); add(`Transit of ${b} across the Sun`, tr.peak, b, ()=>{ const s=sepAt(b,'Sun',tr.peak)*60; return [`Separation from the Sun's centre in this model: ${s.toFixed(2)}′ (ephemeris: ${tr.separation.toFixed(2)}′; the Sun's radius is about 16′)`, Math.abs(s-tr.separation)<.2]; }, 0.0104); }
+  const ap=A.SearchLunarApsis(t0), near=ap.kind===0; add(near?'Moon at perigee (closest to Earth)':'Moon at apogee (farthest from Earth)', ap.time, 'Moon', ()=>{
+    const d=modelAt(O('Moon'),ap.time,geom).dist*AU_KM, dm=withTime(A.MakeTime(ap.time.ut-1/24),()=>modelAt(O('Moon'),A.MakeTime(ap.time.ut-1/24),geom).dist*AU_KM), dp=withTime(A.MakeTime(ap.time.ut+1/24),()=>modelAt(O('Moon'),A.MakeTime(ap.time.ut+1/24),geom).dist*AU_KM);
+    compute(ap.time); const ext = near ? (d<dm && d<dp) : (d>dm && d>dp);
+    return [`Moon's distance in this model: ${Math.round(d).toLocaleString()} km, ${near?'smaller':'larger'} than an hour before (${Math.round(dm).toLocaleString()} km) and after (${Math.round(dp).toLocaleString()} km)`, ext]; });
+  out.sort((a,b)=>a.t.ut-b.t.ut); return out;
+}
+function runEvents(){ const box=$('c-events'); box.innerHTML='<p class="note">Searching…</p>';
+  setTimeout(()=>{ const t0=calcTime(), geom=$('c-geom').value, evs=eventsFrom(t0,geom);
+    box.innerHTML=`<div class="evl">${evs.map((e,k)=>`<div class="evr"><div class="evw"><b>${e.name}</b><span>${fUT(e.t)}</span></div><div class="evc"><span class="${e.ok?'y':'n'}">${e.ok?'✓':'✗'}</span> ${e.check}</div><button class="btn sm" type="button" data-evk="${k}">Show</button></div>`).join('')}</div>`;
+    box.querySelectorAll('[data-evk]').forEach(b=>b.onclick=()=>{ const e=evs[+b.dataset.evk]; closeCalc(); if(state.cTarget>.5) setCentre('Earth');
+      state.ut=e.t.ut-(e.rate&&e.rate<.01? 0.03 : 0.25); select(e.body); focusOn(e.body); setRate(e.rate||.0416667); state.playing=true; $('t-play').textContent='Pause'; toast(`${e.name} · ${fUT(e.t)}`,5000); });
+  }, 30); }
+function openCalc(){ buildCalc(); $('calc').hidden=false; $('c-geom').value = state.uTarget>.5 ? 'round' : 'flex';
+  if(!$('c-time').value) $('c-time').value=A.MakeTime(state.ut).date.toISOString().slice(0,16);
+  runCalc(); runEvents(); $('calc').querySelector('.doc').focus(); }
+function closeCalc(){ $('calc').hidden=true; }
+$('open-calc').onclick=openCalc; $('calc-x').onclick=closeCalc;
+$('calc').addEventListener('click',e=>{ if(e.target.id==='calc') closeCalc(); });
+addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('calc').hidden){ closeCalc(); e.stopImmediatePropagation(); } }, true);
+// --- validation used for the paper: many random epochs, both geometries --------------------------------
+window.__calc={CALC_OBJ, modelVector, helioRead, SB, sceneVector, modelRead};
+window.__validate=(n=120)=>{ const res={epochs:n, maxDirMas:{flex:0,round:0}, maxRelDist:{flex:0,round:0}, worst:null, flex:{epochs:0,worstMiss:0,crossings:0}, events:[]};
+  const objs=CALC_OBJ.filter((o,k)=>o.type!=='star' || k%3===0).filter((o,k)=>o.type!=='sb' || k%2===0);
+  for(let k=0;k<n;k++){ const t=A.MakeTime(-36525+73050*(k+.5)/n); compute(t);
+    for(const o of objs){ const H=helioRead(o,t); for(const geom of ['flex','round']){ const M=modelAt(o,t,geom); const a=angSec(M.dir,H.dir)*1000;
+      if(a>res.maxDirMas[geom]){ res.maxDirMas[geom]=a; if(geom==='round') res.worst=`${o.label} ${t.date.toISOString().slice(0,10)}`; }
+      if(isFinite(H.dist)){ const r=Math.abs(M.dist-H.dist)/H.dist; if(r>res.maxRelDist[geom]) res.maxRelDist[geom]=r; } } } }
+  for(let k=0;k<60;k++){ compute(A.MakeTime(-36525+73050*(k+.5)/60)); updateFlex(); const c=window.__flexCheck(); res.flex.epochs++; res.flex.worstMiss=Math.max(res.flex.worstMiss,c.worstMiss); res.flex.crossings+=c.crossings; }
+  const t0=A.MakeTime(new Date('2026-11-02T00:00:00Z')); res.events=eventsFrom(t0,'flex').map(e=>({name:e.name, t:e.t.date.toISOString(), ok:e.ok, check:e.check})); res.failed=res.events.filter(e=>!e.ok);
+  compute(A.MakeTime(state.ut)); updateFlex(); return res; };
+
 select('Venus');
 $('right').classList.add('min');
 earthLbl.classList.add('ctr');
