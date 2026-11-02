@@ -1666,7 +1666,7 @@ $('open-calc').onclick=openCalc; $('calc-x').onclick=closeCalc;
 $('calc').addEventListener('click',e=>{ if(e.target.id==='calc') closeCalc(); });
 addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('calc').hidden){ closeCalc(); e.stopImmediatePropagation(); } }, true);
 // --- validation used for the paper: many random epochs, both geometries --------------------------------
-window.__calc={CALC_OBJ, modelVector, helioRead, SB, sceneVector, modelRead};
+window.__calc={CALC_OBJ, modelVector, helioRead, SB, sceneVector, modelRead, dispPoint, compute, state};
 window.__validate=(n=120)=>{ const res={epochs:n, maxDirMas:{flex:0,round:0}, maxRelDist:{flex:0,round:0}, worst:null, flex:{epochs:0,worstMiss:0,crossings:0}, events:[]};
   const objs=CALC_OBJ.filter((o,k)=>o.type!=='star' || k%3===0).filter((o,k)=>o.type!=='sb' || k%2===0);
   for(let k=0;k<n;k++){ const t=A.MakeTime(-36525+73050*(k+.5)/n); compute(t);
