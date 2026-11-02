@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Universe Through a Different Lens</title>
+<meta name="description" content="An Earth-centred model of the universe: nine nested spheres from the Moon to al-Falak al-Muhit, holding every planet, star, comet and galaxy where telescopes measure them.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='black'/%3E%3Ccircle cx='20' cy='20' r='15' fill='none' stroke='white' stroke-width='1.5'/%3E%3Ccircle cx='20' cy='20' r='3' fill='%239ec4ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400&family=Sora:wght@300;400;500&family=Amiri:wght@400&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<link rel="preload" href="data/universe.json" as="fetch" crossorigin>
+<link rel="preload" href="data/minor.json" as="fetch" crossorigin>
+<link rel="modulepreload" href="js/vendor/three/build/three.module.min.js">
+<script type="importmap">{"imports":{"three":"./js/vendor/three/build/three.module.min.js","three/addons/":"./js/vendor/three/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="loading"><div class="spin"></div><div class="msg" id="loading-msg">Placing stars, galaxies and planets</div></div>
+<canvas id="scene" aria-label="3D model of the nine spheres, from Earth to al-Falak al-Muhit"></canvas>
+<svg id="ruler" aria-hidden="true"><line id="ruler-line" stroke="rgba(95,225,255,.55)" stroke-width="1.2" stroke-dasharray="2 5"/></svg>
+<div id="labels"></div>
+<div id="warp"></div>
+<div id="vignette"></div>
+
+<div id="intro" aria-label="Introduction">
+  <div class="track">
+    <div class="stage">
+      <div class="beat" data-in="-1" data-out=".13"><h1>The universe, through a different lens</h1></div>
+      <div class="beat" data-in=".16" data-out=".29"><p>Somewhere in this darkness is a small blue point of light.</p></div>
+      <div class="beat low" data-in=".55" data-out=".69"><p>Earth. In this model it holds still, at the centre of everything.</p></div>
+      <div class="beat low" data-in=".74" data-out=".87"><p>Around it turn nine spheres: the Moon, the planets, the stars and every galaxy, each exactly where telescopes see it.</p></div>
+      <div class="beat" data-in=".9" data-out="2"><button class="enter" id="intro-enter">Enter the model</button><br><button class="lnk" id="intro-read">How this compares with the heliocentric model</button></div>
+    </div>
+  </div>
+  <div class="hint" id="intro-hint"><span>SCROLL</span><i></i></div>
+  <button class="skip" id="intro-skip">Skip intro</button>
+</div>
+
+<div id="article" hidden role="dialog" aria-modal="true" aria-labelledby="art-h">
+  <div class="doc panel" tabindex="-1">
+    <button class="icon x" id="art-x" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="art-h">Same sky, different centre: how this model compares with the heliocentric one</h2>
+    <p class="sub">What gravity and light do in each picture, and why nothing you can measure tells them apart.</p>
+
+    <h3>One universe, three descriptions</h3>
+    <p>Every telescope measurement is a direction, a time, a brightness, a colour or a delay. These are <b>events</b>, and physics predicts them the same way whichever point you call the centre. This site shows the same events in three ways:</p>
+    <ul>
+      <li><b>Heliocentric</b> (strictly, the solar system's centre of mass): the frame physicists use, because in it the laws take their simplest form.</li>
+      <li><b>Flexing spheres</b>: Earth held still and true distances kept. Each sphere is a surface drawn through ordinary space that bends just enough to carry its planet. Light and orbits are untouched.</li>
+      <li><b>Round spheres</b>: Earth held still, with each sphere a perfect sphere. To make that work, depth is turned into rank. This is a curved map of the same space, like a Mercator map of the globe.</li>
+    </ul>
+
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Heliocentric</th><th>Flexing spheres</th><th>Round spheres</th></tr></thead>
+      <tbody>
+        <tr><td>Telescope observations</td><td>All reproduced</td><td>All reproduced</td><td>All reproduced</td></tr>
+        <tr><td>Planet orbits around the Sun</td><td>Kepler ellipses</td><td>The same ellipses</td><td>Same paths, drawn distorted on the map</td></tr>
+        <tr><td>Path of light</td><td>Straight, except the tiny bending near masses</td><td>Identical</td><td>Drawn curved by the map, physically unchanged</td></tr>
+        <tr><td>Form of the law of gravity</td><td>Newton, or general relativity, with no extra terms</td><td>The same law plus frame terms</td><td>The same law written in curved coordinates</td></tr>
+        <tr><td>Extra matter or forces needed</td><td>None</td><td>None</td><td>None</td></tr>
+        <tr><td>What it costs</td><td>Nothing</td><td>Fictitious forces, a rotating sky</td><td>Distance on the map is rank, not metres</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Gravity</h3>
+    <p>In the heliocentric frame, gravity is one inverse-square pull from the Sun, plus small pulls between planets. Earth's speed of 29.8 km/s around a 1 AU orbit needs an acceleration of <span class="num">5.9 mm/s²</span> toward the Sun, and the Sun's gravity supplies exactly that.</p>
+    <p>Now hold Earth still. The Sun must circle Earth once a year, so <b>something must accelerate the Sun by 5.9 mm/s²</b>. Earth's own gravity at 1 AU is only <span class="num">0.000018 mm/s²</span>, about 333,000 times too weak. That factor is exactly the Sun's mass divided by Earth's. If the only forces allowed were the planets' real gravity, the Earth-centred picture would break Newton's laws.</p>
+    <p>It doesn't have to break them, because Earth is not an inertial frame. A frame that moves with Earth is accelerating, and every accelerating frame comes with <b>fictitious forces</b>, the same kind that pushes you back in your seat when a car speeds up.</p>
+    <ul>
+      <li>In the Earth-centred frame, every body feels an extra uniform 5.9 mm/s² aimed away from the Sun. This is Earth's own acceleration, seen from Earth, and it carries the Sun around its yearly circle.</li>
+      <li>If Earth's daily turn is also frozen, as in the "Earth fixed" frame here, centrifugal and Coriolis terms appear. These are what swing Foucault's pendulum and twist hurricanes.</li>
+    </ul>
+    <p>With these terms included, the Earth-centred description gives exactly the same motions and is fully consistent. Einstein's general relativity goes further: <b>any</b> coordinates are allowed, and the frame terms simply become part of how gravity is written in those coordinates. Earth is in free fall, so locally it is as good a laboratory as any.</p>
+
+    <h3>Light</h3>
+    <p>In every description light moves at <span class="num">299,792 km/s</span> locally. Near the Sun it is bent by <span class="num">1.75″</span> and delayed slightly. Both effects were predicted by relativity and are now measured: the bending to about 0.01 %, and the delay by the Cassini spacecraft to about 0.002 %. Heliocentric and flexing spheres agree on all of this, because their space is the same ordinary space.</p>
+    <p>In the round-spheres map, light paths are drawn curved, sometimes by tens of degrees. That curving belongs to the map, not to space. The quantity that measures real curvature, the Riemann tensor, is unchanged. No photon feels anything new, so every colour and every radar pulse arrives exactly as before. This is the "curved map of space" option in the light drawer.</p>
+    <p>The spheres could not be <b>physical</b> things that bend light. A real lens made of mass would need thousands of Suns' worth of matter, which would wreck every orbit. A real crystal would split colours and slow radar by frequency. Measurements rule out both, which is why the model treats the spheres as geometry, not matter.</p>
+
+    <h3>Where the Earth-fixed sky becomes strange</h3>
+    <p>If Earth does not spin, the whole sky must turn once a day. At <span class="num">27.5 AU</span>, just inside Neptune's orbit, that daily circuit already moves at the speed of light. Proxima Centauri would race around at nearly <span class="num">10,000 times</span> light speed, and distant galaxies far faster.</p>
+    <p>Relativity allows this because these are <b>coordinate</b> speeds. Nothing outruns light locally, and no signal is sent. It does mean that beyond 27.5 AU no real object can sit still in that frame. The rotating-Earth description and the turning-sky description cover the same events, but only one of them keeps physics simple out there.</p>
+
+    <h3>What physics can and cannot decide</h3>
+    <p>Physics cannot pick an absolute centre. Motion is relative, and every frame here predicts the same sky. What physics <b>can</b> pick out are the inertial frames. In those frames gyroscopes don't drift, pendulums don't precess, and no fictitious forces are needed. They are the frames that do not rotate against the distant galaxies, and the solar system's centre of mass moves almost exactly inertially. That is why astronomers use the heliocentric picture: it is the simplest frame to calculate in.</p>
+    <p>This model chooses differently. It keeps Earth at the centre and the nine spheres as its organising geometry. The flexing view does this without touching space, light or orbits. The round view does it with a curved map. Neither adds a force or a particle, and neither breaks a measured law. What they give up is simplicity, not correctness. Al-Falak al-Muhit lies beyond the particle horizon, from where no signal could ever have reached us, so no observation can confirm it or rule it out.</p>
+  </div>
+</div>
+
+<div id="ui">
+  <header class="hud-top">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="20" cy="20" r="10" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1"/><circle cx="20" cy="20" r="2.2" fill="#9ec4ff"/></svg>
+      <span class="wm">a different lens</span>
+    </div>
+    <nav class="warpbar" aria-label="Jump to scale">
+      <button data-view="earth">Earth</button>
+      <button data-view="planets" aria-current="true">Planets</button>
+      <button data-view="stars">Stars</button>
+      <button data-view="galaxies">Galaxies</button>
+      <button data-view="universe">Universe</button>
+      <button data-view="muhit">al-Muhit</button>
+    </nav>
+    <div class="hud-right">
+      <div class="clock"><div class="d" id="clock-d">—</div><div class="s" id="clock-s">—</div><div class="alt" id="alt">—</div></div>
+      <button class="icon opt" id="z-reset" title="Reset view" aria-label="Reset view"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+      <button class="icon opt" id="snd" title="Sound" aria-label="Sound" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 0 1 0 6"/><path d="M19.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+      <button class="icon" id="hud" title="Hide interface (H)" aria-label="Hide interface"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Panels">
+    <button class="icon" data-pane="view" aria-pressed="false" aria-label="View"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><span class="tip">View and centre</span></button>
+    <button class="icon" data-pane="moments" aria-pressed="false" aria-label="Moments and journey"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tip">Moments and journey</span></button>
+    <button class="icon" data-pane="light" aria-pressed="false" aria-label="Light and laws"><svg viewBox="0 0 24 24"><path d="M3 18c4-9 14-9 18-12"/><circle cx="3" cy="18" r="1.5"/><circle cx="21" cy="6" r="1.5"/></svg><span class="tip">How light bends</span></button>
+    <button class="icon" data-pane="layers" aria-pressed="false" aria-label="Layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg><span class="tip">Layers</span></button>
+    <button class="icon haq" data-pane="haq" aria-pressed="false" aria-label="The ten intellects"><svg viewBox="0 0 24 24"><path d="M12 2v20M5 6h14M7 10h10M9 14h6M10.5 18h3"/></svg><span class="tip">The ten intellects</span></button>
+    <button class="icon" id="open-article" aria-label="Physics: this model and the heliocentric model"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7M8 11h7"/></svg><span class="tip">Physics: how this compares</span></button>
+    <button class="icon" data-pane="settings" aria-pressed="false" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="tip">Settings</span></button>
+  </nav>
+
+  <aside class="panel" id="left" aria-label="Panel">
+    <section class="pane" data-pane="view">
+      <h2>View and centre</h2>
+      <p class="lead">One logarithmic map holds everything: each ten-fold step in distance moves the same amount outward. Directions are always exact.</p>
+      <div class="group"><h3>Centre</h3>
+        <div class="seg"><button id="c-earth" aria-pressed="true">Earth</button><button id="c-sun" aria-pressed="false">Sun</button></div>
+        <p class="note" id="centre-note">Earth sits still at the centre. Click the Sun to move the origin there.</p></div>
+      <div class="group"><h3>Geometry</h3>
+        <div class="seg"><button id="g-onion" aria-pressed="true">Round spheres</button><button id="g-true" aria-pressed="false">Flexing spheres</button></div>
+        <div class="range"><div class="row"><span>Blend</span><output id="morph-o">spheres</output></div>
+          <input type="range" id="morph" min="0" max="1" step="0.01" value="1" aria-label="Blend between measured distances and nested spheres"></div>
+        <p class="note"><b>Round spheres</b> keep perfect spheres; depth means rank, so light paths curve on this map. <b>Flexing spheres</b> keep true distances and straight light; each sphere flexes just enough to hold its planet, and the spheres never touch. From Earth both look identical, and with the Sun as centre the flexing view shows every orbit as its true ellipse.</p></div>
+      <div class="group"><h3>Frame</h3>
+        <div class="seg"><button id="f-earth" aria-pressed="true">Earth fixed</button><button id="f-star" aria-pressed="false">Stars fixed</button></div>
+        <p class="note" id="frame-note">The Muhit turns once per sidereal day (23 h 56 m) and carries every sphere with it.</p>
+        <button class="btn" id="skyview" aria-pressed="false">Stand on Earth and look up</button></div>
+    </section>
+    <section class="pane" data-pane="light">
+      <h2>How light bends</h2>
+      <p class="lead">For the nested spheres to show what telescopes see, light must follow curved paths. Three ways that could happen:</p>
+      <div class="mech" role="radiogroup" aria-label="Light-bending mechanism">
+        <label><input type="radio" name="mech" value="coord" id="m-coord" checked><div><strong>Curved map of space</strong><span>Coordinate geometry (general covariance)</span></div></label>
+        <label><input type="radio" name="mech" value="lens" id="m-lens"><div><strong>Gravitational lensing</strong><span>Real spacetime curvature from mass</span></div></label>
+        <label><input type="radio" name="mech" value="medium" id="m-medium"><div><strong>Crystalline medium</strong><span>Graded refractive index (transformation optics)</span></div></label>
+      </div>
+      <p class="mechtext" id="mech-text"></p>
+      <table class="laws" aria-label="Which laws and observations survive"><thead><tr><th>Law or observation</th><th title="Curved map">Map</th><th title="Lensing">Lens</th><th title="Medium">Med</th></tr></thead><tbody id="laws"></tbody></table>
+      <div class="group"><h3>Light path for the selected body</h3><dl class="ro" id="lp"></dl></div>
+    </section>
+    <section class="pane" data-pane="moments">
+      <h2>Moments</h2>
+      <p class="lead">Jump to an event and watch it unfold, or let the guided journey fly you from outside everything back to Earth.</p>
+      <button class="btn" id="journey">Start the journey</button>
+      <div class="group"><h3>Events</h3>
+        <div class="evs">
+          <button class="btn" data-ev="vsup">Venus passes behind the Sun</button>
+          <button class="btn" data-ev="mopp">Mars loops backward</button>
+          <button class="btn" data-ev="solar">Next solar eclipse</button>
+          <button class="btn" data-ev="lunar">Next lunar eclipse</button>
+        </div></div>
+      <div class="group"><h3>Go to a date</h3><input class="btn" type="date" id="t-date" aria-label="Go to date"></div>
+    </section>
+    <section class="pane" data-pane="layers">
+      <h2>Layers</h2>
+      <div class="chks">
+        <label class="tog"><input type="checkbox" id="l-shells" checked><span class="sw"></span>Spheres</label>
+        <label class="tog"><input type="checkbox" id="l-names" checked><span class="sw"></span>Sphere names</label>
+        <label class="tog"><input type="checkbox" id="l-trails" checked><span class="sw"></span>Planet paths</label>
+        <label class="tog"><input type="checkbox" id="l-light" checked><span class="sw"></span>Light paths</label>
+        <label class="tog"><input type="checkbox" id="l-fabric"><span class="sw"></span>Warped space</label>
+        <label class="tog"><input type="checkbox" id="l-moons" checked><span class="sw"></span>Planet moons</label>
+        <label class="tog"><input type="checkbox" id="l-sb" checked><span class="sw"></span>Asteroids, comets</label>
+        <label class="tog"><input type="checkbox" id="l-sbn"><span class="sw"></span>Small-body names</label>
+        <label class="tog"><input type="checkbox" id="l-milky" checked><span class="sw"></span>Milky Way</label>
+        <label class="tog"><input type="checkbox" id="l-gal" checked><span class="sw"></span>Galaxies</label>
+        <label class="tog"><input type="checkbox" id="l-deep" checked><span class="sw"></span>Deep universe</label>
+        <label class="tog"><input type="checkbox" id="l-lm"><span class="sw"></span>Landmarks</label>
+        <label class="tog"><input type="checkbox" id="l-dso"><span class="sw"></span>Deep-sky names</label>
+        <label class="tog"><input type="checkbox" id="l-zod"><span class="sw"></span>Buruj figures</label>
+        <label class="tog"><input type="checkbox" id="l-signs"><span class="sw"></span>Twelve signs</label>
+        <label class="tog"><input type="checkbox" id="l-stars"><span class="sw"></span>Star names</label>
+        <label class="tog"><input type="checkbox" id="l-ruler"><span class="sw"></span>Distance ruler</label>
+        <label class="tog"><input type="checkbox" id="l-cut" checked><span class="sw"></span>Cut-away</label>
+        <label class="tog"><input type="checkbox" id="l-elem"><span class="sw"></span>Four elements</label>
+        <label class="tog"><input type="checkbox" id="l-outer"><span class="sw"></span>Uranus, Neptune</label>
+        <label class="tog"><input type="checkbox" id="l-glow" checked><span class="sw"></span>Glow</label>
+      </div>
+      <div class="group"><h3>Yearly wobble of the stars</h3>
+        <p class="note">Telescopes measure two yearly shifts in every star. They are under 21″, so they are magnified here. In the Earth-fixed model the eighth sphere carries both.</p>
+        <div class="range"><div class="row"><span>Aberration (20.5″)</span><output id="ab-o">off</output></div><input type="range" id="ab" min="0" max="3" step="0.01" value="0" aria-label="Aberration magnification"></div>
+        <div class="range"><div class="row"><span>Parallax (up to 0.77″)</span><output id="px-o">off</output></div><input type="range" id="px" min="0" max="5" step="0.01" value="0" aria-label="Parallax magnification"></div></div>
+    </section>
+    <section class="pane haq" data-pane="haq">
+      <h2>The ten intellects</h2>
+      <p class="lead">After al-Kirmānī, Rāḥat al-ʿAql: each intellect governs a sphere and is mirrored by a rank of the daʿwa.</p>
+      <div class="ladder" id="ladder"></div>
+    </section>
+    <section class="pane" data-pane="settings">
+      <h2>Settings</h2>
+      <label class="tog big"><input type="checkbox" id="haq-toggle"><span class="sw"></span>Show the Haqiqat layer (intellects and hudud)</label>
+      <p class="note">Off by default. When off, every intellect, hadd and Haqiqat note is hidden across the whole model. Your choice is remembered on this device.</p>
+      <div class="group"><h3>Keyboard</h3>
+        <dl class="keys">
+          <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Jump between scales</dd>
+          <dt><kbd>Space</kbd></dt><dd>Play or pause time</dd>
+          <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Slower or faster</dd>
+          <dt><kbd>S</kbd> <kbd>E</kbd></dt><dd>Centre on the Sun or Earth</dd>
+          <dt><kbd>G</kbd></dt><dd>Switch geometry</dd>
+          <dt><kbd>J</kbd></dt><dd>Start or stop the journey</dd>
+          <dt><kbd>H</kbd></dt><dd>Hide or show the interface</dd>
+          <dt>Scroll</dt><dd>Each notch moves the viewpoint a quarter of a power of ten</dd>
+        </dl></div>
+    </section>
+  </aside>
+
+  <aside class="panel" id="right" aria-label="Selected body">
+    <div class="card-hero">
+      <button class="icon x" id="card-x" aria-label="Close card"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="ar" id="b-ar">الزهرة</div>
+      <h3 id="b-name">Venus</h3>
+      <div class="rank" id="b-rank">—</div>
+    </div>
+    <div class="card-body">
+      <div class="haq"><div class="hadd" id="b-hadd"></div><p class="note" id="b-hnote" style="margin-top:8px"></p></div>
+      <div><h4>Through the telescope</h4>
+        <div class="scopewrap"><canvas id="scope" width="440" height="440" aria-label="Telescope view of the selected body"></canvas></div>
+        <div class="scopecap"><span id="scope-fov">field 90″</span><span>North up, east left</span></div></div>
+      <div><h4>Measured now</h4><dl class="ro" id="ro"></dl></div>
+      <div><h4>Order by measured distance</h4><div class="order" id="order"></div><p class="note" id="order-note" style="margin-top:8px"></p></div>
+    </div>
+  </aside>
+
+  <div class="rail mobtabs glass" style="display:none"></div>
+
+  <div class="panel" id="caption" role="status">
+    <p class="t" id="cap-t"></p><p class="b" id="cap-b"></p>
+    <div class="ctl"><button class="tb" id="cap-prev">Back</button><div class="prog"><i id="cap-p"></i></div><span class="step" id="cap-n"></span><button class="tb" id="cap-next">Next</button><button class="tb" id="cap-x">End journey</button></div>
+  </div>
+
+  <div class="panel" id="timebar" role="toolbar" aria-label="Time">
+    <button class="tb" id="t-rev" title="Reverse time">◀◀</button>
+    <button class="tb" id="t-play">Pause</button>
+    <select class="tb" id="t-rate" aria-label="Speed">
+      <option value="0.0000115741">Real time</option>
+      <option value="0.000694444">1 min / s</option>
+      <option value="0.0416667" selected>1 hour / s</option>
+      <option value="0.25">6 hours / s</option>
+      <option value="1">1 day / s</option>
+      <option value="7">1 week / s</option>
+      <option value="30.44">1 month / s</option>
+      <option value="365.25">1 year / s</option>
+      <option value="3652.5">10 years / s</option>
+      <option value="36525">100 years / s</option>
+    </select>
+    <button class="tb" id="t-now">Now</button>
+    <button class="tb" id="tab-left" style="display:none">Panels</button>
+    <button class="tb" id="tab-right">Details</button>
+  </div>
+
+  <div class="panel" id="gauge" aria-label="Logarithmic distance scale">
+    <div class="read"><b id="g-read">—</b><span id="g-sub">—</span></div>
+    <div class="gtrack" id="gtrack"><div class="axis"></div><div class="mk" id="g-mk"></div></div>
+  </div>
+  <div class="panel" id="toast" role="status"></div>
+</div>
+
+<script src="js/vendor/astronomy.browser.min.js"></script>
+<script type="module" src="js/main.js"></script>
+<noscript><p style="color:#ccc;font-family:sans-serif;padding:24px">This model needs JavaScript and WebGL.</p></noscript>
+</body>
+</html>
