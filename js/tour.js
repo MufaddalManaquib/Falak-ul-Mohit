@@ -1,6 +1,7 @@
 // "What the model can do": a scroll tour with live computations from the model itself.
 // Every number and curve on these pages is computed when the tour opens, by the same code the calculator uses.
 
+import { createStory } from './story.js';
 const A = window.Astronomy;
 const DEG = Math.PI / 180, AU_KM = 149597870.7, AS = 206264.806;
 const $ = id => document.getElementById(id);
@@ -316,47 +317,11 @@ function scramble(nodes) {
       requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
 }
 
-// ---------- the scroll machinery ----------
-let built = false, root, stage, track, pars, prog, raf = 0, active = -1, pSmooth = 0, pTarget = 0;
-function build() {
-  root = $('tour'); stage = root.querySelector('.t-stage'); track = root.querySelector('.t-track'); pars = [...root.querySelectorAll('.t-par')]; prog = root.querySelector('.t-prog');
-  // three layers of stars at different depths
-  pars.forEach((p, k) => { const c = document.createElement('canvas'); c.width = 900; c.height = 900; const x = c.getContext('2d'); let s = 17 + k * 31;
-    const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-    for (let i = 0; i < 260 - k * 60; i++) { const a = .25 + r() * .55; x.fillStyle = `rgba(${200 + (r() * 55) | 0},${210 + (r() * 45) | 0},255,${a})`; const z = (.5 + k * .55) * (r() * .9 + .4); x.beginPath(); x.arc(r() * 900, r() * 900, z, 0, 7); x.fill(); }
-    p.style.backgroundImage = `url(${c.toDataURL()})`; });
-  BEATS.forEach((b, k) => {
-    const sec = document.createElement('section'); sec.className = 'tb ' + (b.layout || 'side');
-    if (b.layout === 'title') sec.innerHTML = `<div class="tcenter">${b.html}</div>`;
-    else { sec.innerHTML = `<div class="tcol"><p class="kicker">${b.kicker}</p><h2 class="ttl">${b.title}</h2><p class="body">${b.body}</p></div><div class="tvis"></div>`;
-      try { b.vis(sec.querySelector('.tvis')); } catch (e) { sec.querySelector('.tvis').textContent = 'This visual could not be computed: ' + e.message; } }
-    b.el = sec; stage.appendChild(sec);
-    const dot = document.createElement('button'); dot.className = 'tdot'; dot.setAttribute('aria-label', b.title || (k === 0 ? 'Start' : 'End')); dot.onclick = () => jump(k); prog.appendChild(dot); b.dot = dot; });
-  track.style.height = (BEATS.length * 120) + 'vh';
-  root.addEventListener('scroll', () => { const max = root.scrollHeight - root.clientHeight; pTarget = max > 0 ? root.scrollTop / max : 0; }, { passive: true });
-  root.querySelector('.t-x').onclick = closeTour;
-  root.addEventListener('click', e => { const a = e.target.closest('[data-act]'); if (!a) return; closeTour(); if (a.dataset.act === 'calc') { window.__ui.enterModel(); window.__ui.openCalc(); } else window.__ui.enterModel(); });
-  addEventListener('keydown', e => { if (e.key === 'Escape' && !root.hidden) closeTour(); });
-  built = true;
-}
-function jump(k) { const max = root.scrollHeight - root.clientHeight; root.scrollTo({ top: (k + .45) / BEATS.length * max, behavior: 'smooth' }); }
-function frame() {
-  raf = requestAnimationFrame(frame);
-  pSmooth += (pTarget - pSmooth) * .14; if (Math.abs(pTarget - pSmooth) < 1e-5) pSmooth = pTarget;
-  const N = BEATS.length, x = pSmooth * N, i = Math.min(N - 1, Math.floor(x)), s = Math.min(1, x - i);
-  const on = (i === 0 && s < .9) || (i === N - 1 && s > .04) || (s > .04 && s < .93) ? i : -1;
-  if (on !== active) { BEATS.forEach((b, k) => { b.el.classList.toggle('on', k === on); b.dot.classList.toggle('cur', k === i); });
-    if (on >= 0 && BEATS[on].onEnter) { try { BEATS[on].onEnter(); } catch (e) { console.error(e); } }
-    active = on; }
-  const b = BEATS[i]; b._s = s; if (b.onScrub && on === i) b.onScrub(s);
-  b.el.style.setProperty('--s', s.toFixed(4));
-  const H = innerHeight; pars.forEach((p, k) => { p.style.transform = `translate3d(0,${(-pSmooth * H * (0.6 + k * 1.1)) % 900}px,0)`; });
-}
+// ---------- the scroll machinery (shared with the history page) ----------
+let story = null;
 export function openTour() {
-  if (!built) build();
-  root.hidden = false; root.scrollTop = 0; pTarget = pSmooth = 0; active = -1; document.body.classList.add('touring');
-  requestAnimationFrame(() => root.classList.add('in'));
-  cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); root.focus({ preventScroll: true });
+  if (!story) story = createStory($('tour'), BEATS, { vhPerBeat: 140, onAction: (act, close) => { close(true); window.__ui.enterModel(); if (act === 'calc') window.__ui.openCalc(); } });
+  story.open();
 }
-export function closeTour() { if (!root) return; root.classList.remove('in'); document.body.classList.remove('touring'); cancelAnimationFrame(raf); setTimeout(() => { root.hidden = true; }, 450); }
+export function closeTour() { if (story) story.close(true); }
 window.__openTour = openTour;

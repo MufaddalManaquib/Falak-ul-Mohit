@@ -7,6 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createScaleZoom, fmtLength, fmtLightTime } from './scale.js';
 import { openTour } from './tour.js';
+import { openHistory } from './history.js';
 
 const A = window.Astronomy;
 const getJSON = u => fetch(u).catch(()=>{ throw new Error(`Could not download ${u}`); }).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
@@ -1389,11 +1390,11 @@ const BEATS=[
  {layout:'side', key:'z5', zoom:[22.75,26.86], kicker:'True scale · the edge', title:'Forty-six billion light-years', body:'Catalogued galaxies thin out near two billion light-years; beyond them the galaxies shown are representative. The farthest light we receive left its source 13.8 billion years ago. At this scale, everything out to Saturn is smaller than a single proton.', data:()=>[['To the edge','46.3 billion light-years'],['Earth radii','7 × 10¹⁹'],['On a linear map','Saturn < a proton']], d:245},
  {layout:'side', key:'log', kicker:'How it all fits', title:'Twenty powers of ten', body:'That is why the model compresses depth. Each ten-fold step outward takes the same space on the map, so Earth and the farthest galaxies fit on one screen. Directions are never changed; only depth is compressed.', ill:()=>svgLog, d:262, m:()=>4.38e26},
  {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere. In this description the whole sky turns with it once a day. It begins where observation ends, so no measurement can confirm it or rule it out.', ill:()=>svgMuhit, data:()=>[['Thickness drawn','10¹⁰⁰⁰ × the edge'],['Turns','Once a sidereal day']], n:9, d:VIEW_MUHIT, m:()=>1e30},
- {layout:'title', key:'enter', html:`<h2 class="hero sm">Nine spheres. One sky.</h2><p class="statement">${STATEMENT}</p><div class="ctas"><button class="enter" id="intro-enter">Enter the model</button></div><div class="lnks"><button class="lnk" id="intro-tour">See what it can do, and how accurately</button><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>`, d:30},
+ {layout:'title', key:'enter', html:`<h2 class="hero sm">Nine spheres. One sky.</h2><p class="statement">${STATEMENT}</p><div class="ctas"><button class="enter" id="intro-enter">Continue to the model</button></div><div class="lnks"><button class="lnk" id="intro-tour">See what it can do, and how accurately</button><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>`, d:30},
 ];
 BEATS.forEach(b=>{ if(b.body_){ b.body2=b.body_; b.data=()=>liveData(b.body2); if(!b.ill) b.ill=()=>svgSpheres(b.n); } else if(b.n && !b.ill) b.ill=()=>svgSpheres(b.n); });
 const NB=BEATS.length;
-introEl.querySelector('.track').style.height=(NB*110)+'vh';
+introEl.querySelector('.track').style.height=(NB*150)+'vh';   // a long hold on every beat
 const beatEls=BEATS.map(b=>{ const el=document.createElement('section'); el.className='beat '+b.layout;
   el.innerHTML = b.layout==='side'
     ? `<div class="col"><p class="kicker">${b.kicker}</p><h2 class="ttl">${b.title}</h2><p class="body">${b.body}</p><dl class="data"></dl><div class="illw"></div></div>`
@@ -1427,6 +1428,22 @@ function fillBeats(){ BEATS.forEach((b,k)=>{ if(b.layout!=='side') return; const
   if(b.data) el.querySelector('.data').innerHTML=b.data().map(([t,v])=>`<div><dt>${t}</dt><dd>${v}</dd></div>`).join('');
   if(b.ill) el.querySelector('.illw').innerHTML=b.ill(); }); filled=true; }
 const sideLayout = () => innerWidth>=900 && innerWidth/innerHeight>1.05;
+const _iq=new THREE.Quaternion(), _iq2=new THREE.Quaternion(), _UP=new THREE.Vector3(0,1,0), _bw=new THREE.Vector3(), _sw=new THREE.Vector3();
+// how the camera frames beat k. For a planet: the view turns until that planet is in front, seen from its sunlit side,
+// and the camera's aim moves part of the way out to it, so the planet sits near the middle of the picture.
+function beatView(k){ const b=BEATS[k], sway=Math.sin(state.time*.12)*.03;
+  if(b.body2){ bodyWorld(b.body2,_bw); const Pw=_bw.clone(), P=_bw.clone().normalize();
+    let dir;
+    if(b.body2==='Sun'){ const side=new THREE.Vector3().crossVectors(_UP,P); if(side.lengthSq()<1e-6) side.set(1,0,0); side.normalize();
+      dir=P.clone().multiplyScalar(Math.cos(.62)).addScaledVector(side,Math.sin(.62)); }
+    else { bodyWorld('Sun',_sw); const L=_sw.sub(Pw).normalize(), ang=P.angleTo(L);       // L: from the planet towards the Sun
+      const f=Math.min(.8,Math.max(0,1-.7/Math.max(ang,1e-3)));                            // keep the phase angle seen by the camera below ~40°
+      if(ang>3.1){ const side=new THREE.Vector3().crossVectors(_UP,P).normalize(); dir=P.clone().multiplyScalar(Math.cos(1.6*f)).addScaledVector(side,Math.sin(1.6*f)); }
+      else { _iq.setFromUnitVectors(P,L); _iq2.identity().slerp(_iq,f); dir=P.clone().applyQuaternion(_iq2); } }
+    dir.addScaledVector(_UP,.28+sway).normalize();
+    return {dir, target:Pw.multiplyScalar(.82), dist:b.d*.55}; }
+  const base = k<=2 ? introDir.clone() : HOME.clone().normalize();
+  return {dir:base.applyAxisAngle(_UP, state.time*.02), target:new THREE.Vector3(), dist:b.d}; }
 function introCamera(dt){
   const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*7);
   if(!filled) fillBeats();
@@ -1435,7 +1452,7 @@ function introCamera(dt){
     introDir=sw.clone().multiplyScalar(.75).add(new THREE.Vector3(0,.35,0)).add(new THREE.Vector3().crossVectors(sw,new THREE.Vector3(0,1,0)).normalize().multiplyScalar(.55)).normalize(); }
   const x=p*NB, i=Math.min(NB-1,Math.floor(x)), s=Math.min(1,x-i);
   // text: one beat is on at a time; CSS handles the staggered entrance and the exit
-  const on = (i===0 && s<.9) || (i===NB-1 && s>.05) || (s>.05 && s<.92) ? i : -1;
+  const on = (i===0 && s<.92) || (i===NB-1 && s>.03) || (s>.03 && s<.96) ? i : -1;
   if(on!==activeBeat){ beatEls.forEach((el,k)=>el.classList.toggle('on',k===on)); activeBeat=on; }
   beatEls[i].style.setProperty('--s', s.toFixed(3));   // gentle parallax of the text within each beat
   $('intro-hint').style.opacity = p<.004 ? 1 : 0;
@@ -1448,10 +1465,12 @@ function introCamera(dt){
     else camera.setViewOffset(innerWidth, innerHeight, wide ? -sh*innerWidth*.2 : 0, wide ? 0 : -sh*innerHeight*.16, innerWidth, innerHeight);
     scrimEl.style.opacity=sh; scrimEl.classList.toggle('portrait',!wide); scrimC.style.opacity=1-sh; }
   // camera: during the first half of each beat, move (in log distance) from the previous beat's view to this one
-  const d0=BEATS[Math.max(0,i-1)].d, d1=BEATS[i].d, e=smooth(0,.55,s), d=d0*Math.pow(d1/d0,e);
-  const toTop=smooth(3/NB,3.5/NB,p);
-  const dir=introDir.clone().lerp(HOME.clone().normalize(), toTop).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), state.time*.02);
-  camera.position.copy(dir.multiplyScalar(d)); camera.lookAt(0,0,0); controls.target.set(0,0,0);
+  // the move happens in the first 40% of each beat; the rest of the beat holds still (sticky), with only a slow sway
+  const d0=BEATS[Math.max(0,i-1)].d, d1=BEATS[i].d, e=smooth(0,.42,s);
+  const vA=beatView(Math.max(0,i-1)), vB=beatView(i), d=vA.dist*Math.pow(vB.dist/vA.dist,e);
+  _iq.setFromUnitVectors(vA.dir,vB.dir); _iq2.identity().slerp(_iq,e);
+  const dir=vA.dir.clone().applyQuaternion(_iq2).normalize(), tgt=vA.target.lerp(vB.target,e);
+  camera.position.copy(tgt).addScaledVector(dir,d); camera.lookAt(tgt); controls.target.copy(tgt);
   earth.scale.setScalar(.04+.96*smooth(2/NB,2.45/NB,p));
   dotSprite.scale.setScalar(d*.03); dotSprite.material.opacity=smooth(1.05/NB,1.25/NB,p)*(1-smooth(2.1/NB,2.4/NB,p)); dotSprite.visible=dotSprite.material.opacity>.002;
   if(Math.abs(state.introP-state.intro)>.0015 && Math.max(d1/d0,d0/d1)>2.5 && s<.55) state.warpT=performance.now()+200;   // a brief glow while travelling far
@@ -1483,9 +1502,11 @@ function introCamera(dt){
       else { $('ir-num').innerHTML='edge × 10<sup>1000</sup>'; $('ir-txt').textContent='the outer face of al-Muhit'; } } }
 }
 // what the tour shows at each moment: each sphere and its contents appear in turn
-const appear = k => smooth((k+.08)/NB,(k+.5)/NB,state.intro);
+const appear = k => smooth((k-.02)/NB,(k+.26)/NB,state.intro);   // each body arrives with its text, early in its beat
 function applyIntroVis(t){
-  BODIES.forEach((b,k)=>{ const f=appear(bIndex(b.key)); b.mesh.visible=f>.001; b.mesh.scale.setScalar(Math.max(.001,f));
+  const xI=state.intro*NB, ci=Math.min(NB-1,Math.floor(xI)), si=xI-ci, cur=BEATS[ci].body2;
+  BODIES.forEach((b,k)=>{ const f=appear(bIndex(b.key)), hero = b.key===cur ? smooth(.02,.32,si)*(1-smooth(.86,1,si)) : 0;   // the planet of the moment swells into view, then settles back
+    b.mesh.visible=f>.001; b.mesh.scale.setScalar(Math.max(.001,f*(1+(b.key==='Sun'?.5:1.1)*hero)));
     planetShells[k].userData.iv=f; b.trailLine.visible=f>.98; b.lbl._introOK=f>.6; });
   sunGlow.visible=BMAP.Sun.mesh.visible; sunGlow.material.opacity=appear(bIndex('Sun'));
   const fJ=appear(bIndex('Jupiter')), fS=appear(bIndex('Saturn')), fM=appear(bIndex('Mars'));
@@ -1511,9 +1532,9 @@ function enterModel(){ if(state.intro===null) return; state.intro=null;
   state.playing=true; $('t-play').textContent='Pause';
   if(camera.position.length()>60) warpTo(30);
   setTimeout(()=>toast('Drag to turn · scroll to zoom · click any planet, star or galaxy',4500),900); }
-$('intro-enter').onclick=enterModel; $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
+$('intro-enter').onclick=()=>openHistory();   // the history of models comes first, then the model $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
 $('intro-calc').onclick=()=>{ enterModel(); openCalc(); };
-$('intro-tour').onclick=()=>openTour(); $('open-tour').onclick=()=>openTour();
+$('intro-tour').onclick=()=>openTour(); $('open-tour').onclick=()=>openTour(); $('open-history').onclick=()=>openHistory();
 addEventListener('resize',()=>{ lastShift=null; lastL=null; });
 camera.position.set(0,0,34);
 
@@ -1749,6 +1770,7 @@ $('calc').addEventListener('click',e=>{ if(e.target.id==='calc') closeCalc(); })
 addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('calc').hidden){ closeCalc(); e.stopImmediatePropagation(); } }, true);
 // --- validation used for the paper: many random epochs, both geometries --------------------------------
 window.__focus=(k)=>{ if(BMAP[k]) select(k); focusOn(k); };
+window.__dbg=()=>({cam:camera.position.toArray(), tgt:controls.target.toArray(), merc:bodyWorld("Mercury",new THREE.Vector3()).toArray()});
 window.__calc={CALC_OBJ, modelVector, helioRead, SB, sceneVector, modelRead, dispPoint, compute, state, toDate, angSec, eventsFrom, SUNOBJ, orbitPos, SKY};
 window.__ui={enterModel:()=>enterModel(), openCalc:()=>openCalc(), openArticle:()=>openArticle(), inIntro:()=>state.intro!==null};
 window.__validate=(n=120)=>{ const res={epochs:n, maxDirMas:{flex:0,round:0}, maxRelDist:{flex:0,round:0}, worst:null, flex:{epochs:0,worstMiss:0,crossings:0}, events:[]};

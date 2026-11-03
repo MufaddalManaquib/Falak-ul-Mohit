@@ -420,13 +420,13 @@ a.icon{color:var(--muted)}
 }
 
 /* ---- tour: what the model can do ---- */
-#tour{position:fixed;inset:0;z-index:60;overflow-y:auto;overflow-x:hidden;background:#000;scrollbar-width:none;overscroll-behavior:contain;opacity:0;transition:opacity .45s ease;outline:none}
-#tour::-webkit-scrollbar{display:none}
-#tour.in{opacity:1}
+#tour,#history{position:fixed;inset:0;z-index:60;overflow-y:auto;overflow-x:hidden;background:#000;scrollbar-width:none;overscroll-behavior:contain;opacity:0;transition:opacity .45s ease;outline:none}
+#tour::-webkit-scrollbar,#history::-webkit-scrollbar{display:none}
+#tour.in,#history.in{opacity:1}
 body.touring #ui{visibility:hidden}
 .t-par{position:fixed;left:0;right:0;top:-900px;height:calc(100vh + 2700px);background-repeat:repeat;background-size:900px 900px;pointer-events:none;will-change:transform;z-index:0}
 .t-par:nth-child(1){opacity:.5}.t-par:nth-child(2){opacity:.65}.t-par:nth-child(3){opacity:.8}
-#tour::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 70% 60% at 70% 45%,rgba(40,60,120,.18),rgba(0,0,0,0) 70%),linear-gradient(90deg,rgba(0,0,0,.75) 0%,rgba(0,0,0,.35) 42%,rgba(0,0,0,0) 60%)}
+#tour::before,#history::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 70% 60% at 70% 45%,rgba(40,60,120,.18),rgba(0,0,0,0) 70%),linear-gradient(90deg,rgba(0,0,0,.75) 0%,rgba(0,0,0,.35) 42%,rgba(0,0,0,0) 60%)}
 .t-track{position:relative;z-index:2}
 .t-stage{position:sticky;top:0;height:100vh;height:100dvh;pointer-events:none}
 .tb{position:absolute;inset:0;display:flex;align-items:center;visibility:hidden;transition:visibility 0s linear .6s;padding:0 clamp(28px,5.5vw,110px);gap:clamp(24px,4vw,72px)}
@@ -527,3 +527,63 @@ body.touring #ui{visibility:hidden}
 .tb .body{margin:0 0 26px;max-width:36ch;font:300 clamp(15.5px,1.25vw,19.5px)/1.62 var(--f-body);color:#dadcee}
 
 .beat.side .col{transform:translateY(calc((0.5 - var(--s,.5)) * 30px))}
+
+/* ---- history of models ---- */
+.t-era{display:inline-block;align-self:flex-start;margin:0 0 14px;padding:5px 12px;border:1px solid rgba(158,196,255,.35);border-radius:999px;font:400 11.5px var(--f-body);letter-spacing:.06em;color:#cfdcff;background:rgba(158,196,255,.06)}
+.hsvg .hring{fill:none;stroke:rgba(200,212,255,.18);stroke-width:1}
+.hsvg .hring.hi{stroke:rgba(158,196,255,.5)}
+.hsvg .hmuhit{fill:none;stroke:#ffd9a0;stroke-width:5;opacity:.9;stroke-linecap:round}
+.hsvg .hstar{fill:rgba(230,236,255,.8)}
+.hsvg .hstars circle{fill:#dfe6ff}
+.hsvg .hlab{font-size:12px;fill:#c9d3f2}
+.hsvg .hgold{fill:#ffd9a0}
+.hsvg .harrow{stroke:rgba(158,196,255,.6);stroke-width:1;fill:none;stroke-dasharray:3 4}
+.hsvg .hpath{fill:none;stroke:rgba(255,210,122,.35);stroke-width:1}
+.hsvg .hglow{stroke:rgba(255,220,160,.35);stroke-width:4}
+.hsvg .hsight{stroke:rgba(255,210,122,.6);stroke-width:1}
+.hsvg .hsight2{stroke:rgba(255,210,122,.25);stroke-width:1;stroke-dasharray:3 4}
+.hsvg .harm{stroke:rgba(158,196,255,.55);stroke-width:1}
+.hsvg .htrail{fill:none;stroke:#ff9d6e;stroke-width:1.6;stroke-linecap:round;opacity:.85}
+.hsvg .htrail2{fill:none;stroke:rgba(255,210,122,.45);stroke-width:1}
+.hsvg .hhelix{fill:none;stroke:rgba(158,196,255,.55);stroke-width:1.3}
+.hsvg .hline{stroke:rgba(255,255,255,.15)}
+.hsvg .htick{stroke:rgba(255,217,160,.6);stroke-width:1.2}
+.hsvg .hspin{fill:none;stroke:#9ec4ff;stroke-width:1.2}
+.hsvg .hcross{stroke:#9ec4ff;stroke-width:1.4}
+.hsvg .hwedge{fill:rgba(158,196,255,.16);stroke:rgba(158,196,255,.35);animation:hfade .6s ease both}
+.hsvg .harc{fill:none;stroke:#ffd9a0;stroke-width:1.4;stroke-dasharray:4 4}
+@keyframes hfade{from{opacity:0}to{opacity:1}}
+.tb .hlad{opacity:0;transition:opacity .6s ease}
+.tb.on .hlad{opacity:1;transition-delay:calc(.25s + var(--i) * .12s)}
+.hline-list{list-style:none;margin:0;padding:0 0 0 26px;position:relative;display:flex;flex-direction:column;gap:14px}
+.hline-list::before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:1px;background:linear-gradient(180deg,rgba(158,196,255,.1),rgba(158,196,255,.5),rgba(255,217,160,.6))}
+.hline-list li{position:relative;display:grid;grid-template-columns:110px minmax(130px,190px) 1fr;gap:4px 18px;align-items:baseline;opacity:0;transform:translateX(18px);transition:opacity .5s ease,transform .6s ease}
+.tb.on .hline-list li{opacity:1;transform:none;transition-delay:calc(.2s + var(--i) * .11s)}
+.hline-list li::before{content:"";position:absolute;left:-23px;top:6px;width:9px;height:9px;border-radius:50%;border:1px solid rgba(158,196,255,.7);background:#05060c}
+.hline-list li.m::before{background:#ffd9a0;border-color:#ffd9a0;box-shadow:0 0 12px rgba(255,217,160,.8)}
+.hline-list .hy{font:400 11.5px var(--f-body);color:#8e93b4;font-variant-numeric:tabular-nums}
+.hline-list b{font:400 14.5px var(--f-body);color:#eef0fb}
+.hline-list li.m b{color:#ffd9a0}
+.hline-list .hd{font:300 13.5px/1.45 var(--f-body);color:#c4c8e0}
+.tb.muhit .body{max-width:44ch;font-size:clamp(14.5px,1.08vw,17px)}
+.mu-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px}
+.mu-stats div{border-top:1px solid rgba(255,217,160,.35);padding-top:10px;opacity:0;transform:translateY(10px);transition:opacity .6s,transform .7s}
+.tb.on .mu-stats div{opacity:1;transform:none;transition-delay:calc(.4s + var(--i) * .15s)}
+.mu-stats dt{font-size:11px;color:#a9a08c}
+.mu-stats dd{margin:4px 0 0;font:300 clamp(15px,1.4vw,21px)/1.2 var(--f-display);color:#ffe7c2;font-variant-numeric:tabular-nums}
+@media (max-width:899px),(max-aspect-ratio:105/100){
+  .hline-list li{grid-template-columns:1fr;gap:2px}.hline-list .hd{font-size:12.5px}
+  .mu-stats{grid-template-columns:1fr 1fr}
+  .tb.muhit .body{font-size:13.5px}
+}
+.tsvg.hsvg{overflow:hidden}
+@media (max-width:899px),(max-aspect-ratio:105/100){
+  #history .tb{padding-top:max(64px,8vh);gap:10px}
+  #history .tb .tvis{order:-1;flex:none}
+  #history .tsvg{max-height:34vh}
+  #history .tb .ttl{font-size:clamp(28px,8vw,44px);margin-bottom:10px}
+  #history .tb .body{font-size:13.5px;line-height:1.5;max-width:none}
+  #history .mu-stats{display:none}
+  #history .hline-list{gap:8px}#history .hline-list .hd{font-size:11.5px}
+}
+.story:not(.in){pointer-events:none}
