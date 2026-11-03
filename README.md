@@ -12,6 +12,8 @@ An interactive, Earth-centred model of the universe. Nine nested spheres turn ar
 - **Stars** at their parallax distances (HYG database), the twelve zodiac figures after al-Sufi, **9,879 galaxies** at comoving distances from redshift (OpenNGC), clusters and nebulae by parallax.
 - **Small bodies:** 359 real asteroids and dwarf planets and 118 comets and interstellar objects on their orbital elements, plus a statistical main belt and Jupiter's Trojans.
 - **A scroll-driven introduction** that builds the model one sphere at a time, with a live powers-of-ten ruler and a "marble" scale (Earth as a 1 cm marble) to show its true size.
+- **A true-scale journey** inside the introduction: the view widens from Earth to the edge of the observable universe with nothing compressed (real planetary distances, catalogue stars and galaxies, seen from above the galaxy's plane), so the reason for the logarithmic scale is plain.
+- **A tour of what the model can do** (`js/tour.js`): ten scroll sections, every number computed live in the browser by the model itself: two-route comparison for any body, tonight's differences against telescope resolution, a 200-year validation run, the next eclipse with the Moon crossing the Sun, Venus's phases, Mars's retrograde loop, Jupiter's moons hour by hour, Bradley's aberration ellipse, every catalogued small body, and the honest limits.
 - **A calculator** that computes any planet, moon, star, comet or asteroid twice, once from this model's own geometry and once heliocentrically, and shows the difference, with geocentric and topocentric (observer) coordinates, altitude with refraction, and rise, culmination and set times; plus coming eclipses, transits, oppositions, seasons and lunar apsides, each checked inside the model, with links to NASA JPL Horizons for independent verification.
 - **A scientific paper** (`paper.html`) with the full mathematics, physics, data sources, validation results and a classification of what is observation, frame choice, visual device, approximation or fiction.
 - **A short physics article** comparing this model with the heliocentric one.
@@ -33,17 +35,19 @@ then open <http://localhost:8000>.
 index.html            page markup
 css/style.css         all styling
 js/main.js            the model (three.js scene, astronomy, interface, calculator)
+js/scale.js           the true-scale journey (canvas)
+js/tour.js            the capabilities tour (live computations)
 validation/validate.js  Node script: event times against NASA predictions; dynamics in three frames
 paper.html            the scientific paper
 js/vendor/            three.js r170, Astronomy Engine 2.1.19 and KaTeX 0.16.11, served locally
 data/universe.json    stars, constellation lines, galaxies, clusters, landmarks
 data/minor.json       asteroid and comet orbital elements
-textures/             Earth and Moon imagery
+textures/             Sun, planet, moon and Earth maps (see credits)
 ```
 
 ## Verifying it yourself
 
-Open the browser console on the model page and run `__validate(120)`. It compares this model with an independent heliocentric computation for 141 objects at 120 dates from 1900 to 2100 in both geometries, checks the flexing-sphere construction at 60 dates, and re-runs the event checks. Typical result: directions agree within 2.2 milliarcseconds, distances within 1 part in 10⁸, and the flexing spheres pass through every planet (error below 10⁻¹²) and never cross.
+Open the browser console on the model page and run `__validate(120)`. It compares this model with a separate heliocentric computation (same ephemeris) for 141 objects at 120 dates from 1900 to 2100 in both geometries, checks the flexing-sphere construction at 60 dates, and re-runs the event checks. Typical result: directions agree within 2.2 milliarcseconds, distances within 1 part in 10⁸, and the flexing spheres pass through every planet (error below 10⁻¹²) and never cross.
 
 From the repository root, `node validation/validate.js` compares eclipse and transit times with NASA's published predictions (agreement within seconds for eclipses, 19 s and 55 s for the 2012 and 2019 transits). It also integrates Newton's equations in inertial, Earth-centred and Earth-fixed rotating coordinates, showing they agree to milliarcseconds when the frame forces are included, and that the Sun is 81° wrong after a year without them.
 
@@ -55,5 +59,7 @@ From the repository root, `node validation/validate.js` compares eclipse and tra
 - Zodiac figures: Stellarium sky culture after al-Sufi.
 - Galaxies, clusters, nebulae: OpenNGC by Mattia Verga (CC BY-SA 4.0).
 - Asteroid and comet elements: Stellarium `ssystem_minor.ini`; 3I/ATLAS from the JPL Small-Body Database.
-- Earth and Moon textures: three.js example textures, derived from NASA imagery.
+- Sun, planet, Moon and Earth maps (day, night, clouds) and Saturn's rings: [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0), based on NASA mission data. Earth specular map: three.js example textures.
+- Io, Europa, Ganymede and Callisto: USGS global mosaics from NASA Voyager and Galileo images (public domain), as prepared in the stellata project.
+- Titan: Celestia content (CelestiaProject/CelestiaContent), A. Anpilogov, P. Garcia, AstroChara and others, from NASA/JPL/ESA Cassini data (CC BY 3.0).
 - Equation typesetting in the paper: KaTeX (MIT).
