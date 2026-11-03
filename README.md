@@ -14,6 +14,8 @@ An interactive, Earth-centred model of the universe. Nine nested spheres turn ar
 - **A scroll-driven introduction** that builds the model one sphere at a time, with a live powers-of-ten ruler and a "marble" scale (Earth as a 1 cm marble) to show its true size.
 - **A true-scale journey** inside the introduction: the view widens from Earth to the edge of the observable universe with nothing compressed (real planetary distances, catalogue stars and galaxies, seen from above the galaxy's plane), so the reason for the logarithmic scale is plain.
 - **A history of models** (`js/history.js`), shown after the introduction and before entering: Eudoxus and Aristotle, Aristarchus, Ptolemy, the astronomers of the Islamic world and the ninth starless sphere (al-Falak al-Muhit), Copernicus, Tycho, Kepler and Galileo, Newton, Bradley to Hubble, Einstein, and today's moving Sun, each with an animated diagram, ending with who turns the sky in each model and the rotation of al-Muhit.
+- **Evidence for every model** in the history: what the sky showed, the fault, and how the nested, flexing spheres handle it, then a scorecard of every test (one item, solar light bending, still open).
+- **What if?** (`js/whatif.js`): a clearly speculative page that changes the physics on purpose (al-Muhit physically dragging inertial frames, the spheres replacing dark matter or dark energy, a speed of light or a strength of gravity that varies) and sets each against observation, with computed charts.
 - **A tour of what the model can do** (`js/tour.js`): ten scroll sections, every number computed live in the browser by the model itself: two-route comparison for any body, tonight's differences against telescope resolution, a 200-year validation run, the next eclipse with the Moon crossing the Sun, Venus's phases, Mars's retrograde loop, Jupiter's moons hour by hour, Bradley's aberration ellipse, every catalogued small body, and the honest limits.
 - **A calculator** that computes any planet, moon, star, comet or asteroid twice, once from this model's own geometry and once heliocentrically, and shows the difference, with geocentric and topocentric (observer) coordinates, altitude with refraction, and rise, culmination and set times; plus coming eclipses, transits, oppositions, seasons and lunar apsides, each checked inside the model, with links to NASA JPL Horizons for independent verification.
 - **A scientific paper** (`paper.html`) with the full mathematics, physics, data sources, validation results and a classification of what is observation, frame choice, visual device, approximation or fiction.
@@ -39,6 +41,7 @@ js/main.js            the model (three.js scene, astronomy, interface, calculato
 js/scale.js           the true-scale journey (canvas)
 js/tour.js            the capabilities tour (live computations)
 js/history.js         the history of models
+js/whatif.js          the speculative 'what if' page
 js/story.js           shared sticky scroll engine for the tour and the history
 validation/validate.js  Node script: event times against NASA predictions; dynamics in three frames
 paper.html            the scientific paper

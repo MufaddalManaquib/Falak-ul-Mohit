@@ -8,6 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createScaleZoom, fmtLength, fmtLightTime } from './scale.js';
 import { openTour } from './tour.js';
 import { openHistory } from './history.js';
+import { openWhatIf } from './whatif.js';
 
 const A = window.Astronomy;
 const getJSON = u => fetch(u).catch(()=>{ throw new Error(`Could not download ${u}`); }).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
@@ -1534,7 +1535,7 @@ function enterModel(){ if(state.intro===null) return; state.intro=null;
   setTimeout(()=>toast('Drag to turn · scroll to zoom · click any planet, star or galaxy',4500),900); }
 $('intro-enter').onclick=()=>openHistory();   // the history of models comes first, then the model $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
 $('intro-calc').onclick=()=>{ enterModel(); openCalc(); };
-$('intro-tour').onclick=()=>openTour(); $('open-tour').onclick=()=>openTour(); $('open-history').onclick=()=>openHistory();
+$('intro-tour').onclick=()=>openTour(); $('open-tour').onclick=()=>openTour(); $('open-history').onclick=()=>openHistory(); $('open-whatif').onclick=()=>openWhatIf();
 addEventListener('resize',()=>{ lastShift=null; lastL=null; });
 camera.position.set(0,0,34);
 

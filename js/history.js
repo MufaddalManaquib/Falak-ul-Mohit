@@ -187,6 +187,23 @@ B.push({ era: 'Today', kicker: 'The Sun in motion', title: 'Nothing is at rest',
         const [px, py] = f(t); at(o.d, px, py); o.tr.draw(f, Math.max(start, t - 14), t, 280); }); };
   } });
 
+// 11b · one sky, every test
+const TESTS = [
+  ['Planets brighten and dim; the Moon’s size changes', 'Spheres flex to each body’s measured distance', 1],
+  ['Mars loops backward around opposition', 'Positions from the ephemeris, seen from Earth', 1],
+  ['Venus shows every phase, full included', 'Venus’s sphere reaches past the Sun’s', 1],
+  ['Moons circle Jupiter', 'Carried with Jupiter, each with its own light time', 1],
+  ['Total and annular eclipses, and their times', 'Moon’s true distance; times within seconds of NASA', 1],
+  ['Aberration (20.5″) and parallax (to 0.77″)', 'A yearly motion of the eighth sphere, at true size', 1],
+  ['Radar and laser ranges', 'Read back from the geometry to one part in 10⁸', 1],
+  ['Mercury’s perihelion advance', 'Contained in the fitted ephemeris', 1],
+  ['Foucault’s pendulum, the Coriolis effect', 'Frame forces of the Earth-fixed frame (described, not simulated)', 2],
+  ['Starlight bent by the Sun', 'Not yet applied: 1.75″ at the Sun’s edge', 0],
+  ['Galaxies’ redshifts, the microwave background', 'Placed at comoving distances; physics unchanged', 1]];
+B.push({ era: 'The scorecard', kicker: 'Every test, one sky', title: 'What the nested spheres must match',
+  body: 'Each model above was caught by something seen from Earth. This model is held to all of it at once, and to the modern barycentric calculation, which it reproduces to milliarcseconds. One item is still open, and it is marked.',
+  vis(v) { v.innerHTML = `<table class="hscore"><thead><tr><th>Seen from Earth</th><th>In the flexing spheres</th><th></th></tr></thead><tbody>${TESTS.map(([a, b, ok], i) => `<tr style="--i:${i}"><td>${a}</td><td>${b}</td><td class="st s${ok}">${ok === 1 ? '✓' : ok === 2 ? '≈' : '○'}</td></tr>`).join('')}</tbody></table><p class="hkey">✓ reproduced · ≈ accounted for in the description · ○ not yet applied</p>`; } });
+
 // 12 · who turns the sky
 const ROWS = [['c. 350 BCE', 'Aristotle', 'The sphere of the stars, moved by an unmoved mover beyond it', 0], ['c. 150', 'Ptolemy', 'The first motion of the heavens as a whole; no starless sphere', 0],
   ['10th–11th c.', 'Ikhwān al-Ṣafāʾ · al-Kirmānī', 'al-Falak al-Muhit: a ninth, starless sphere that turns everything within it', 1], ['1543', 'Copernicus', 'Nothing: the stars are at rest and Earth spins', 0],
@@ -214,12 +231,64 @@ B.push({ era: 'Sphere 9', cls: 'muhit', kicker: 'al-Falak al-Muhit', title: 'Onc
     this.anim = t => rot(all, -(t * 9) % 360, cx, cy);
   } });
 
-B.push({ layout: 'title', label: 'Enter', html: `<p class="t-eyebrow">Now</p><h2 class="t-hero sm">Nine spheres, one sky</h2><p class="t-lede">You have seen how the heavens were drawn. Now see them drawn again: every modern measurement, held in nine spheres around a still Earth, inside al-Falak al-Muhit.</p><div class="t-ctas"><button class="t-cta" data-act="enter">Enter the model</button><button class="t-cta ghost" data-act="tour">What it can do, and how accurately</button></div>` });
+B.push({ layout: 'title', label: 'Enter', html: `<p class="t-eyebrow">Now</p><h2 class="t-hero sm">Nine spheres, one sky</h2><p class="t-lede">You have seen how the heavens were drawn. Now see them drawn again: every modern measurement, held in nine spheres around a still Earth, inside al-Falak al-Muhit.</p><div class="t-ctas"><button class="t-cta" data-act="enter">Enter the model</button><button class="t-cta ghost" data-act="tour">What it can do, and how accurately</button><button class="t-cta ghost" data-act="whatif">What if the spheres did more?</button></div>` });
+
+
+// ---------- for every model: what the sky showed, the fault, and how the flexing spheres handle it ----------
+const EVIDENCE = {
+  'Spheres within spheres': [
+    'Planets change in brightness: Mars at opposition is many times brighter than at conjunction. Some solar eclipses are total, others annular, so the Moon’s distance changes.',
+    'Every body is fixed to a sphere centred on Earth, so its distance can never change. The nested spheres also cannot reproduce the size and shape of Mars’s backward loops.',
+    'Each flexing sphere follows its body’s measured distance, bulging and dipping as the body comes nearer or goes farther. Brightness, apparent size and annular eclipses come out right.'],
+  'A Sun at the centre, too early': [
+    'Critics expected the stars to shift through the year if Earth moved, and saw nothing. No one felt Earth moving.',
+    'The objection was mistaken: the largest stellar parallax is 0.77″, far below the eye’s limit. The model itself had circles and no quantitative theory.',
+    'Parallax and aberration are carried as a yearly motion of the eighth sphere at true size. What Earth’s motion explains, the frame forces of the Earth-fixed description explain here.'],
+  'Circles on circles': [
+    'Venus shows a full set of phases (Galileo, 1610), so it passes behind the Sun. The Moon’s apparent size changes by only about 13%, not the near doubling Ptolemy’s lunar model implies. By the 16th century the tables were off by degrees for Mars.',
+    'Spheres ordered rigidly by distance keep Venus always between Earth and the Sun. The equant breaks uniform circular motion. Each planet’s cycle is tied to the Sun by coincidence, not cause.',
+    'The order of the spheres is kept but distances are not forced: when Venus lies beyond the Sun its sphere reaches out past the Sun’s, so every phase appears. The Moon’s distance comes from the ephemeris.'],
+  'The ninth sphere': [
+    'The same evidence that later counted against Ptolemy: Venus’s full phases, the Moon’s nearly constant size, and the planets’ cycles locked to the Sun’s year.',
+    'Better mechanisms (the Ṭūsī couple, Ibn al-Shāṭir’s equant-free models) but the same frame: distance-ordered shells, and no physical reason for the solar link.',
+    'The solar link appears because positions come from the Sun’s gravity, expressed in the Earth-fixed frame. The ninth sphere is kept as the description of the daily turn, which is exactly the turn of Earth read the other way.'],
+  'Turned inside out': [
+    'Tycho measured positions to about 2′. Tables built on Copernicus’s circles missed Mars by degrees; even Kepler’s best circle-based model missed by 8′, the famous eight minutes that forced him to ellipses. No stellar parallax could be found.',
+    'Perfect circles at uniform speed, centred near (not on) the Sun, and a single motionless sphere for all the stars.',
+    'The ephemeris contains elliptical orbits and the planets’ mutual pulls. The stars are placed at their measured distances, from a few light-years to thousands.'],
+  'A still Earth, done better': [
+    'Positions cannot tell it from Copernicus. What later counted against it as physics: the aberration of starlight (1728), parallax (1838), and Foucault’s pendulum (1851), which turns because the ground turns under it.',
+    'Read as dynamics, a heavy Sun orbiting a light, unaccelerated Earth breaks Newton’s laws. The orbits were still circles.',
+    'The model keeps Tycho’s still Earth and adds what Newton requires: the frame forces of the Earth-fixed description. Aberration and parallax become yearly motions of the eighth sphere; the pendulum’s turn is the Coriolis effect of the turning frame.'],
+  'Ellipses, and the evidence': [
+    'Over decades planets drift off pure ellipses: Jupiter and Saturn speed up and slow down in a 900-year cycle, and Mercury’s closest point to the Sun advances 43″ a century more than Newtonian theory allows.',
+    'Each planet is treated alone around a fixed Sun. Mutual pulls and relativity are missing.',
+    'The model’s ephemeris (VSOP87) includes the mutual perturbations and is fitted to relativistic numerical ephemerides, so these drifts are in its positions, within its arcminute accuracy.'],
+  'One law for heaven and Earth': [
+    'Mercury’s extra 43″ per century (Le Verrier, 1859). Starlight bent by 1.75″ at the Sun’s edge (1919), twice the Newtonian value. No experiment could find absolute space (Michelson and Morley, 1887).',
+    'Absolute space, and gravity acting instantly at a distance.',
+    'Mercury’s advance is in the fitted ephemeris. The frame is a choice, not absolute space. Light bending by the Sun is not yet applied in the model: an open limitation of 1.75″ at the Sun’s edge, a few thousandths of an arcsecond elsewhere.'],
+  'The stars move, and so do we': [
+    'Aberration of 20.5″ (1728), parallax of 0.3″ for 61 Cygni (1838), the Sun far from the galaxy’s centre (1918), and galaxies beyond our own (1925).',
+    'What fell here was the shared assumption of every earlier model: one sphere holding all the stars at a single distance, with nothing beyond.',
+    'The eighth sphere holds 8,920 stars at their parallax distances and 9,879 galaxies at distances from their redshifts, out to the edge of what can be seen.'],
+  'No privileged frame': [
+    'General relativity has passed every test made of it: Mercury, light bending, radar delays, gravitational waves, black-hole images.',
+    'No known failure where it has been tested. To fit galaxies and the expansion of the universe it needs dark matter and dark energy, which have not been detected directly.',
+    'The model works inside general relativity: an Earth-fixed frame with its frame effects included. It inherits the theory’s successes and its open questions alike.'],
+  'Nothing is at rest': [
+    'The Sun’s motion through the galaxy is measured from the motions of nearby stars; our motion against the microwave background shows as its 3.36 mK dipole.',
+    'No fault: this is the modern, barycentric picture. Its centre is a choice of convenience.',
+    'Every observation in this picture is reproduced. Read back from the nested spheres alone, directions agree with it within 2.2 milliarcseconds and distances within one part in 10⁸, from 1900 to 2100.']
+};
+const evCard = ([seen, fault, fix]) => `<div class="hev"><div class="hev-r seen"><h4>What the sky showed</h4><p>${seen}</p></div><div class="hev-r fault"><h4>The fault</h4><p>${fault}</p></div><div class="hev-r fix"><h4>In the nested, flexing spheres</h4><p>${fix}</p></div></div>`;
+B.forEach(b => { const ev = EVIDENCE[b.title]; if (!ev) return; const vis0 = b.vis; b.cls = (b.cls ? b.cls + ' ' : '') + 'hasev';
+  b.vis = function (v) { vis0.call(this, v); v.insertAdjacentHTML('beforeend', evCard(ev)); }; });
 
 let story = null;
 export function openHistory() {
   if (!story) story = createStory(document.getElementById('history'), B, { vhPerBeat: 150,
-    onAction: (act, close) => { close(true); window.__ui.enterModel(); if (act === 'tour' && window.__openTour) setTimeout(() => window.__openTour(), 500); },
+    onAction: (act, close) => { close(true); if (act === 'whatif' && window.__openWhatIf) { setTimeout(() => window.__openWhatIf(), 480); return; } window.__ui.enterModel(); if (act === 'tour' && window.__openTour) setTimeout(() => window.__openTour(), 500); },
     onClose: () => window.__ui.enterModel() });
   story.open();
 }
