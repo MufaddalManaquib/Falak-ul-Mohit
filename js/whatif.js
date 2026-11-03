@@ -56,6 +56,106 @@ B.push({ kicker: 'What if · 1', title: 'al-Muhit really drags',
     this.anim = t => { const a = t * 18; sky.setAttribute('transform', `rotate(${a % 360} ${cx} ${cy})`); gyro.setAttribute('transform', `rotate(${(a * eta) % 360} ${cx} ${cy})`); };
   } });
 
+// 2a–2c · a whole universe dragged by al-Muhit, Earth still
+// Each observation lists the level of new physics at which it first holds:
+// 0 literal drag of the spheres only · 1 + the drag carries the inertial frames · 2 + the sky's yearly swing makes a uniform field · 3 + speeds limited locally, al-Muhit a frame
+const OBS = [
+  ['Rising and setting of Sun, Moon, planets and stars', 0], ['Planet positions and retrograde loops', 0], ['Phases of Venus; planets brighten and dim', 0],
+  ['Eclipses and their timing', 0], ['Radar and laser ranges; light-time delays', 0], ['Two tides a day', 0], ['Seasons', 0], ['Stellar parallax', 0],
+  ['Foucault’s pendulum turns', 1], ['Coriolis effect: cyclones, trade winds', 1], ['Earth’s equatorial bulge; weaker gravity at the equator', 1],
+  ['Geostationary satellites stay put', 1], ['Ring-laser gyroscopes; Sagnac correction in GPS', 1], ['Daily aberration of starlight (0.32″)', 1],
+  ['Gyroscopes stay fixed on quasars (Gravity Probe B)', 1], ['Inertia the same in every direction (Hughes–Drever)', 1],
+  ['Annual aberration of starlight (20.5″)', 2], ['The Sun’s yearly circuit obeys gravity', 2], ['Spacecraft navigation (Voyager, New Horizons)', 2], ['Yearly Doppler shift of starlight (±30 km/s)', 2],
+  ['Nothing outruns light', 3], ['No cause acts from beyond the observable edge', 3]];
+const LEVELS = [
+  ['Literal drag', 'al-Muhit turns and drags the spheres and everything on them. Earth is still and does not spin. Physics is otherwise ordinary.'],
+  ['+ dragged inertial frames', 'New physics: the turning heavens drag inertia itself, completely. The Coriolis and centrifugal forces become fields of al-Muhit’s rotation.'],
+  ['+ a yearly field', 'New physics: the sky’s yearly swing creates a uniform field of 5.9 mm/s² everywhere, which carries the Sun round a still Earth.'],
+  ['+ al-Muhit as the frame', 'New rule: speeds are limited only locally. al-Muhit is the turning of the frame, sourced by all the matter we can see, not a body beyond the edge.']];
+const AUD = 1, ORB = [['Moon', .00257, 27.32, '#d8dbe6', 3], ['Mercury', .387, 87.97, '#c9c4bd', 3], ['Venus', .723, 224.7, '#fff0cc', 4], ['Sun', 1, 365.25, '#ffd27a', 7], ['Mars', 1.524, 686.98, '#ff9d6e', 4], ['Jupiter', 5.203, 4332.6, '#f1e2c4', 6], ['Saturn', 9.537, 10759, '#e9d6b4', 5.5]];
+B.push({ kicker: 'What if · 1, built', title: 'A universe dragged by al-Muhit',
+  body: 'A working model: Earth still and not spinning, the seven flexible spheres drawn with the nesting rule of the paper, the sphere of stars, and al-Muhit turning once a day and dragging everything inside. Step through the levels: each adds one piece of new physics, and the count shows how many observations the barycentric model explains that this universe still gets right.',
+  extra: '<div class="wlev" role="group" aria-label="Level of new physics"></div><p class="wlevtxt"></p>',
+  vis(v) { v.innerHTML = '<div class="wuni"></div><div class="wcount"><b>0</b><span>of ' + OBS.length + ' observations hold</span></div><ul class="wfail"></ul>';
+    const s = svg('Earth still at the centre; al-Muhit turns and drags seven flexible spheres, the stars and the planets', 600, 590); v.querySelector('.wuni').appendChild(s);
+    const cx = 300, cy = 300, R = rho => 34 + (rho + 6.5) * 21.5, delta = .25, k0 = 3, rhoE = Math.log(4.26e-5), beta = [.00257, .39, .72, 1, 1.52, 5.2, 9.5].map(Math.log);
+    el('circle', { cx, cy, r: 268, class: 'wmuhitglow' }, s);
+    const sky = el('g', {}, s);
+    const muhit = el('g', {}, sky); el('circle', { cx, cy, r: 258, class: 'wmuhit' }, muhit);
+    for (let k = 0; k < 96; k++) { const a = k / 96 * TAU, r1 = k % 8 ? 252 : 246; el('line', { x1: cx + Math.cos(a) * r1, y1: cy + Math.sin(a) * r1, x2: cx + Math.cos(a) * 264, y2: cy + Math.sin(a) * 264, class: 'wtick' }, muhit); }
+    el('circle', { cx, cy, r: 238, class: 'wring' }, sky);
+    for (let k = 0; k < 70; k++) { const a = (k * 137.5) * Math.PI / 180, rr = 228 + (k * 7) % 18; el('circle', { cx: cx + Math.cos(a) * rr, cy: cy + Math.sin(a) * rr, r: k % 7 ? .9 : 1.6, class: 'wstar' }, sky); }
+    const goldA = .9; el('circle', { cx: cx + Math.cos(goldA) * 236, cy: cy + Math.sin(goldA) * 236, r: 4, fill: '#ffd27a' }, sky);
+    const curves = ORB.map((o, i) => el('path', { class: i === 3 ? 'wsph sun' : 'wsph' }, sky));
+    const dots = ORB.map(o => el('circle', { r: o[4], fill: o[3] }, sky));
+    const sunWarn = el('circle', { r: 15, class: 'wwarn' }, sky), field = el('line', { class: 'wfield', 'marker-end': 'url(#wArr)' }, sky);
+    el('defs', {}, s).innerHTML = '<marker id="wArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ffd9a0"/></marker>';
+    el('circle', { cx, cy, r: 13, fill: '#2a63b8' }, s); el('circle', { cx: cx - 4, cy: cy - 4, r: 4, fill: 'rgba(255,255,255,.25)' }, s);
+    const pend = el('line', { class: 'wpend' }, s), gyro = el('line', { class: 'wgyro2' }, s);
+    const lab = txt(s, cx, 584, '', 'wlab', 'middle'), rim = txt(s, 588, 16, '', 'wlab', 'end');
+    txt(s, 12, 16, 'Time not to scale; distances on a log scale.', 'axl');
+    txt(s, 12, 32, 'white: Foucault pendulum · dashed: gyroscope aimed at the gold star', 'axl');
+    let level = 0;
+    const lev = v.closest('.tb').querySelector('.wlev'), levTxt = v.closest('.tb').querySelector('.wlevtxt'), cnt = v.querySelector('.wcount b'), fail = v.querySelector('.wfail');
+    LEVELS.forEach(([n], k) => { const b = document.createElement('button'); b.textContent = `${k}. ${n}`; b.onclick = () => setLevel(k); lev.appendChild(b); });
+    function setLevel(k) { level = k; lev.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', i === k)); levTxt.textContent = LEVELS[k][1];
+      const ok = OBS.filter(o => o[1] <= k).length; cnt.textContent = ok; cnt.className = ok === OBS.length ? 'all' : '';
+      const bad = OBS.filter(o => o[1] > k); fail.innerHTML = bad.length ? bad.slice(0, 6).map(o => `<li>${o[0]}<i>fixed at level ${o[1]}</i></li>`).join('') + (bad.length > 6 ? `<li class="more">and ${bad.length - 6} more</li>` : '') : '<li class="ok">Every observation on the list holds.</li>';
+      rim.textContent = k < 3 ? 'al-Muhit’s rim: 10¹⁴ × light ✕' : 'al-Muhit: a frame, local speeds below light ✓'; rim.setAttribute('class', k < 3 ? 'wlab bad' : 'wlab good'); }
+    setLevel(0); this.setLevel = setLevel;
+    const geo = (o, tY) => { if (o[0] === 'Moon') { const a = TAU * tY * 365.25 / o[2]; return [o[1] * Math.cos(a), o[1] * Math.sin(a)]; }
+      const ae = TAU * tY, E = [Math.cos(ae), Math.sin(ae)]; if (o[0] === 'Sun') return [-E[0], -E[1]];
+      const a = TAU * tY * 365.25 / o[2] + o[1]; return [o[1] * Math.cos(a) - E[0], o[1] * Math.sin(a) - E[1]]; };
+    this.anim = t => {
+      const day = t / 14 * TAU, tY = t / 70;                       // one daily turn per 14 s; one year per 70 s
+      sky.setAttribute('transform', `rotate(${(day * 180 / Math.PI) % 360} ${cx} ${cy})`);
+      this._f = (this._f || 0) + 1; if (this._f % 2) return;          // the flexing spheres are recomputed every other frame
+      const P = ORB.map(o => { const [x, y] = geo(o, tY); return { r: Math.log(Math.hypot(x, y)), th: Math.atan2(y, x) }; });
+      const cc = (th, j) => 2 * (1 - Math.cos(th - P[j].th)), N = 7, kk = [];
+      for (let j = 0; j < N; j++) { let m = 0; for (let l = 0; l < N; l++) { if (l === j) continue; const a = Math.min(j, l), b = Math.max(j, l), C = P[a].r - P[b].r + (b - a) * delta; if (C > 0) m = Math.max(m, 2.05 * C / Math.max(1e-3, cc(P[l].th, j))); } kk[j] = Math.max(k0, m); }
+      for (let i = 0; i < N; i++) { const pts = [];
+        for (let q = 0; q <= 140; q++) { const th = q / 140 * TAU; let L = rhoE + (i + 1) * delta, U = 1e9;
+          for (let j = 0; j <= i; j++) L = Math.max(L, P[j].r + (i - j) * delta - kk[j] * cc(th, j));
+          for (let l = i; l < N; l++) U = Math.min(U, P[l].r - (l - i) * delta + kk[l] * cc(th, l));
+          const rr = R(Math.min(U, Math.max(L, beta[i]))); pts.push([cx + Math.cos(th) * rr, cy + Math.sin(th) * rr]); }
+        curves[i].setAttribute('d', path(pts) + 'Z'); }
+      P.forEach((p, j) => { const rr = R(p.r); dots[j].setAttribute('cx', cx + Math.cos(p.th) * rr); dots[j].setAttribute('cy', cy + Math.sin(p.th) * rr); });
+      const sp = P[3], sx = cx + Math.cos(sp.th) * R(sp.r), sy = cy + Math.sin(sp.th) * R(sp.r);
+      sunWarn.setAttribute('cx', sx); sunWarn.setAttribute('cy', sy); sunWarn.style.opacity = level < 2 ? 1 : 0;
+      field.setAttribute('x1', sx); field.setAttribute('y1', sy); field.setAttribute('x2', sx + (cx - sx) * .35); field.setAttribute('y2', sy + (cy - sy) * .35); field.style.opacity = level >= 2 ? 1 : 0;
+      // on Earth: with frames dragged, the pendulum's plane and the gyroscope turn with the sky; without, they stay fixed to the still Earth
+      const fr = level >= 1 ? day : 0, pa = .3 + fr, ga = goldA + fr;
+      pend.setAttribute('x1', cx - Math.cos(pa) * 26); pend.setAttribute('y1', cy - Math.sin(pa) * 26); pend.setAttribute('x2', cx + Math.cos(pa) * 26); pend.setAttribute('y2', cy + Math.sin(pa) * 26);
+      gyro.setAttribute('x1', cx); gyro.setAttribute('y1', cy); gyro.setAttribute('x2', cx + Math.cos(ga) * 120); gyro.setAttribute('y2', cy + Math.sin(ga) * 120);
+      lab.textContent = level >= 1 ? 'Pendulum and gyroscope turn with the sky, as observed' : 'Pendulum and gyroscope stay still while the sky turns: not what is observed';
+      lab.setAttribute('class', level >= 1 ? 'wlab good' : 'wlab bad'); };
+  } });
+
+const FIX = [
+  ['Literal drag', 'Positions, phases, eclipses, distances, tides, seasons, parallax: 8 of 22', 'Everything that depends on rotation or on Earth’s yearly motion against local frames', '—'],
+  ['Dragged inertial frames', '+ pendulum, Coriolis, bulge, satellites, gyroscopes, daily aberration: 16 of 22', 'Annual aberration, the Sun’s dynamics, spacecraft, yearly Doppler; superluminal speeds', 'Complete rotational frame dragging (a strong Mach principle). Must be complete to 1 part in 10¹¹ and perfectly uniform (Hughes–Drever).'],
+  ['A yearly field', '+ annual aberration, the Sun’s circuit, spacecraft, yearly Doppler: 20 of 22', 'al-Muhit moves 10¹⁴ times faster than light and acts from beyond the observable edge', 'Translational frame dragging: the sky’s yearly swing produces a uniform gravitational field. This is Einstein’s equivalence principle applied to the whole sky.'],
+  ['al-Muhit as the frame', '+ no local speed above light; no cause from beyond the edge: 22 of 22', 'Nothing on the list', 'Speeds limited only locally (as in general relativity), and al-Muhit’s pull sourced by all the matter we can see.']];
+B.push({ kicker: 'What if · 1, the tally', title: 'What fails, and what it takes',
+  body: 'The literal picture keeps everything that is pure geometry and loses everything that is dynamics. Each failure can be repaired, but only by inventing physics: first that the turning heavens carry inertia itself, then that their yearly swing makes a field, then that speed limits apply only locally.',
+  vis(v) { v.innerHTML = `<table class="hscore wfix"><thead><tr><th>Level</th><th>Holds</th><th>Still fails</th><th>New physics needed</th></tr></thead><tbody>${FIX.map(([a, b, c, d], i) => `<tr style="--i:${i}"><td><b>${i}.</b> ${a}</td><td>${b}</td><td>${c}</td><td>${d}</td></tr>`).join('')}</tbody></table>`; } });
+
+B.push({ kicker: 'What if · 1, the result', title: 'The physics you end up with',
+  body: 'Put the three repairs together and something familiar appears. Frame dragging, a uniform field from an accelerating frame, and speed limits that hold only locally are, term for term, general relativity written for a still Earth. The one genuinely new idea left is the strong Machian claim that all inertia comes from al-Muhit. That claim makes two testable demands, and both are already met to extraordinary precision: the drag must be complete, and the encompassing sphere must be perfectly uniform.',
+  extra: verdict('mid', 'Verdict', 'Consistent with every observation listed, and indistinguishable from the model as built except through the Machian postulate. Speculative: a synthesis for this page, not an established theory.'),
+  vis(v) { const s = svg('The three repairs combine into general relativity in Earth-fixed coordinates plus a Machian postulate', 620, 420); v.appendChild(s);
+    const steps = [['Literal drag', '8 / 22', '#ff9d84'], ['+ dragged inertia', '16 / 22', '#ffd9a0'], ['+ yearly field', '20 / 22', '#ffd9a0'], ['+ local speed limit', '22 / 22', '#9fe2b4']];
+    steps.forEach(([n, c, col], k) => { const x = 70 + k * 160, g = el('g', { class: 'wstep', style: `--i:${k}` }, s);
+      el('circle', { cx: x, cy: 120, r: 46, fill: 'none', stroke: col, 'stroke-width': 1.5 }, g); txt(g, x, 116, c, 'wbig2', 'middle'); txt(g, x, 186, n, 'wlab', 'middle');
+      if (k < 3) el('path', { d: `M${x + 52} 120 L${x + 108} 120`, class: 'wlink', 'marker-end': 'url(#wArr2)' }, g); });
+    el('defs', {}, s).innerHTML = '<marker id="wArr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8e93b4"/></marker>';
+    const g2 = el('g', { class: 'wstep', style: '--i:5' }, s);
+    el('rect', { x: 40, y: 236, width: 540, height: 132, rx: 14, class: 'wbox' }, g2);
+    txt(g2, 310, 272, '=  general relativity in Earth-fixed coordinates', 'wlab big', 'middle');
+    txt(g2, 310, 304, '+  one new postulate: all inertia is induced by al-Muhit', 'wlab big gold', 'middle');
+    txt(g2, 310, 340, 'demands: drag complete to 1 part in 10¹¹ (Gravity Probe B) · inertia isotropic (Hughes–Drever)', 'tick', 'middle');
+  } });
+
 // 3 · dark matter
 const G = 6.674e-11, MSUN = 1.989e30, KPC = 3.0857e19, A0 = 299792458 * (67.66e3 / 3.0857e22) / TAU;
 B.push({ kicker: 'What if · 2', title: 'The spheres replace dark matter',
@@ -125,7 +225,7 @@ B.push({ kicker: 'What if · 5', title: 'Gravity weakens with time',
   } });
 
 // 7 · summary
-const SUM = [['al-Muhit drags physically', 'The daily forces as gravity of the turning heavens', 'Allowed only if the drag is complete, to 1 part in 10¹¹', 'mid'],
+const SUM = [['al-Muhit drags physically', 'The daily forces as gravity of the turning heavens', 'Literal drag: 8 of 22 hold. With three repairs, 22 of 22, but then it is general relativity plus a Machian postulate', 'mid'],
   ['Spheres replace dark matter', 'Flat rotation curves of galaxies', 'Fails for clusters, the Bullet Cluster and the CMB', 'mid'],
   ['Spheres replace dark energy', 'The faintness of distant supernovae', 'A void that large is excluded by the kSZ signal', 'no'],
   ['Light speeds up with distance', 'No superluminal sky; al-Muhit’s rim allowed', 'SN 1987A, lensing delays and quasar spectra exclude it', 'no'],
