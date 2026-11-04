@@ -679,3 +679,26 @@ body.touring #ui{visibility:hidden}
 .wfail li.ok{color:#b9ecc8}
 .wfix td{font-size:12.5px;vertical-align:top}.wfix td:last-child{color:#ffe7c2}
 @media (max-width:899px),(max-aspect-ratio:105/100){ .wuni .tsvg{max-height:34vh} .wfail{columns:1;font-size:11px;max-height:16vh;overflow:auto} .wcount b{font-size:28px} .wfix td{font-size:10.5px} }
+.tb.tall{align-items:flex-start;padding-top:max(84px,11vh);padding-bottom:60px}
+.beat.tall{align-items:flex-start!important;padding-top:max(80px,10vh)!important;padding-bottom:140px}
+.t-par{top:-900px!important;height:calc(100vh + 1800px)!important}
+.beat.on>*,.beat.on .col>*,.tb.on .tcol>*,.tb.on .tcenter>*{will-change:opacity,transform}
+.slbl.hold{font-family:var(--f-body);font-size:11.5px;color:#e8ecff;background:rgba(5,8,18,.55);padding:2px 7px;border-radius:6px;white-space:nowrap}
+/* past model beside the flexing-sphere answer */
+.hpair{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:stretch}
+.hpast,.hfix{display:flex;flex-direction:column;min-width:0}
+.hpair h5{margin:0 0 6px;font:500 10.5px var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:#8e93b4}
+.hfix{border:1px solid rgba(255,217,160,.28);border-radius:16px;padding:10px 12px 6px;background:radial-gradient(ellipse at 50% 40%,rgba(255,217,160,.06),rgba(255,217,160,0) 70%)}
+.hfix h5{color:#ffd9a0}
+.tb.hasev .hpast .hsvg{max-height:40vh}
+.hfixsvg{max-height:36vh;margin:auto 0}
+.hsvg .hflex{fill:none;stroke:rgba(170,195,255,.6);stroke-width:1.4}
+.hsvg .hflex.sun{stroke:rgba(255,210,122,.7)}
+.hsvg .hfield{fill:none;stroke:rgba(255,217,160,.55);stroke-width:1.2}
+.hsvg .hpend{stroke:#fff;stroke-width:2;stroke-linecap:round}
+.hsvg .hbent{fill:none;stroke:#ffd9a0;stroke-width:1.5}
+.hsvg .hwarn{fill:#ff9d84}
+.hsvg .hcheck{fill:none;stroke:#9fe2b4;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.hsvg .hlab.big{font-size:17px}
+@media (max-width:899px),(max-aspect-ratio:105/100){ .hpair{gap:8px}.hpair h5{font-size:9px} #history .tb.hasev .hpast .hsvg,.hfixsvg{max-height:20vh} }
+.hfixcap{margin:4px 0 4px;font:300 12px/1.4 var(--f-body);color:#d9cfb8;text-align:center}

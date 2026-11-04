@@ -83,7 +83,7 @@ B.push({ era: '9th–14th centuries · the Islamic world', kicker: 'al-Battānī
     const ox = 350, oy = 462, RR = [30, 52, 74, 96, 118, 140, 162, 192, 248];
     const lab = ['Moon', 'Mercury', 'Venus', 'Sun', 'Mars', 'Jupiter', 'Saturn', 'Stars · precession', 'al-Falak al-Muhit · starless'];
     RR.forEach((rr, k) => { const g = el('path', { d: `M${ox - rr} ${oy} A${rr} ${rr} 0 0 1 ${ox + rr} ${oy}`, class: k === 8 ? 'hmuhit' : k === 7 ? 'hring hi' : 'hring' }, s); void g;
-      if (k >= 7) txt(s, ox + rr * Math.cos(-38 * DEG) + 10, oy + rr * Math.sin(-38 * DEG) + (k === 8 ? -8 : 4), lab[k], k === 8 ? 'hlab hgold' : 'hlab'); });
+      if (k >= 7) txt(s, ox + rr * Math.cos(-142 * DEG) - 8, oy + rr * Math.sin(-142 * DEG) + (k === 8 ? -8 : 4), lab[k], k === 8 ? 'hlab hgold' : 'hlab', 'end'); });
     earth(s, ox, oy, 9);
     const ticks = el('g', {}, s); for (let k = 0; k < 36; k++) { const a = Math.PI + k / 36 * Math.PI; el('line', { x1: ox + Math.cos(a) * 240, y1: oy + Math.sin(a) * 240, x2: ox + Math.cos(a) * 256, y2: oy + Math.sin(a) * 256, class: 'htick' }, ticks); }
     this.anim = t => { const th = t * .9, c = { x: tx + r * Math.cos(th), y: ty + r * Math.sin(th) }, px = tx + 2 * r * Math.cos(th);
@@ -216,7 +216,7 @@ B.push({ era: 'Across the centuries', kicker: 'Who turns the sky?', title: 'The 
 // 13 · al-Falak al-Muhit
 const OMEGA = TAU / 86164.0905, R_EDGE = 46.27e9 * 9.4607e15, C = 299792458, V = OMEGA * R_EDGE;
 B.push({ era: 'Sphere 9', cls: 'muhit', kicker: 'al-Falak al-Muhit', title: 'Once a day, beyond the edge',
-  body: 'In this model al-Falak al-Muhit turns once every sidereal day, 23 hours 56 minutes, and its turning carries every sphere within it, so the whole sky wheels around a still Earth. Its inner face lies beyond the edge of the observable universe, 46 billion light-years away. To turn once a day out there, it must move at about 3 × 10²² metres per second, a hundred trillion (10¹⁴) times the speed of light. No material body can do that: here the physics of moving bodies gives out. What remains is geometry, and that is allowed. General relativity accepts the frame in which the heavens turn and Earth is still, and on one reading of the theory the turning heavens drag the inertial frames within them along. Mathematics and physics permit this description; no measurement can confirm or refute it, because nothing from beyond the edge can reach us.',
+  body: 'In this model al-Falak al-Muhit turns once every sidereal day, 23 hours 56 minutes, and its turning carries every sphere within it, so the whole sky wheels around a still Earth. Its inner face lies beyond the edge of the observable universe, 46 billion light-years away. To turn once a day out there, it must move at about 3 × 10²² metres per second, a hundred trillion (10¹⁴) times the speed of light. No material body can do that: here the physics of moving bodies gives out. What remains is geometry, and that is allowed. General relativity accepts the frame in which the heavens turn and Earth is still, and on one reading of the theory the turning heavens drag the inertial frames within them along. Mathematics and physics permit this description; no measurement can confirm or refute it, because nothing from beyond the edge can reach us. What turns al-Muhit, and why inertia follows the distant universe, physics cannot yet say.',
   vis(v) { v.innerHTML = '<div class="mu-wrap"></div><div class="mu-stats"></div>';
     const s = svg('al-Falak al-Muhit turning once a day and carrying the eight spheres within it', 600, 420); v.querySelector('.mu-wrap').appendChild(s); defs(s);
     const cx = 300, cy = 215; el('circle', { cx, cy, r: 205, fill: 'url(#hMuhit)' }, s);
@@ -284,6 +284,113 @@ const EVIDENCE = {
 const evCard = ([seen, fault, fix]) => `<div class="hev"><div class="hev-r seen"><h4>What the sky showed</h4><p>${seen}</p></div><div class="hev-r fault"><h4>The fault</h4><p>${fault}</p></div><div class="hev-r fix"><h4>In the nested, flexing spheres</h4><p>${fix}</p></div></div>`;
 B.forEach(b => { const ev = EVIDENCE[b.title]; if (!ev) return; const vis0 = b.vis; b.cls = (b.cls ? b.cls + ' ' : '') + 'hasev';
   b.vis = function (v) { vis0.call(this, v); v.insertAdjacentHTML('beforeend', evCard(ev)); }; });
+
+// ---------- beside each past model: an animation of how the nested, flexing spheres handle the same evidence ----------
+const FIXTYPE = { 'Spheres within spheres': 'distance', 'A Sun at the centre, too early': 'parallax', 'Circles on circles': 'venus', 'The ninth sphere': 'solar',
+  'Turned inside out': 'ellipse', 'A still Earth, done better': 'frame', 'Ellipses, and the evidence': 'rosette', 'One law for heaven and Earth': 'bending',
+  'The stars move, and so do we': 'depth', 'No privileged frame': 'none', 'Nothing is at rest': 'agree' };
+function fixScene(type) {
+  const s = el('svg', { viewBox: '0 0 300 300', role: 'img', class: 'tsvg hsvg hfixsvg' }); defs(s);
+  const C = 150, cap = txt(s, 150, 292, '', 'tick', 'middle'); let anim = () => {};
+  const flexLine = cls => el('path', { class: cls }, s);
+  const curvePath = f => { const p = []; for (let q = 0; q <= 120; q++) { const th = q / 120 * TAU, r = f(th); p.push(`${(C + Math.cos(th) * r).toFixed(1)},${(C - Math.sin(th) * r).toFixed(1)}`); } return 'M' + p.join(' L') + 'Z'; };
+  const bump = (th, th0, w) => { let d = Math.atan2(Math.sin(th - th0), Math.cos(th - th0)); return Math.exp(-d * d / (2 * w * w)); };
+  if (type === 'distance') {
+    s.setAttribute('aria-label', 'Mars on its flexing sphere, coming nearer and brighter at opposition');
+    const sunS = flexLine('hflex sun'), marS = flexLine('hflex'); earth(s, C, C, 8); const sd = dot(s, 6, '#ffd27a'), md = dot(s, 4, '#ff9d6e', 'hglow');
+    cap.textContent = 'Mars’s sphere follows its distance: near, and bright, at opposition';
+    const R = d => 46 + 52 * Math.log(d / .4);
+    anim = t => { const ae = t * .5, am = ae / 1.881, ex = Math.cos(ae), ey = Math.sin(ae), mx = 1.524 * Math.cos(am) - ex, my = 1.524 * Math.sin(am) - ey, dM = Math.hypot(mx, my), thM = Math.atan2(my, mx), thS = Math.atan2(-ey, -ex);
+      const rM = R(dM), rS = R(1), fM = th => 108 + (rM - 108) * bump(th, thM, .45), fS = th => Math.min(rS, fM(th) - 9);
+      marS.setAttribute('d', curvePath(fM)); sunS.setAttribute('d', curvePath(fS));
+      at(sd, C + Math.cos(thS) * rS, C - Math.sin(thS) * rS); at(md, C + Math.cos(thM) * rM, C - Math.sin(thM) * rM); md.setAttribute('r', 2.2 + 3.2 / dM); };
+  } else if (type === 'parallax') {
+    s.setAttribute('aria-label', 'A nearby star wobbling yearly on the eighth sphere, locked to the Sun');
+    ring(s, C, C, 120, 'hring hi'); ring(s, C, C, 42); earth(s, C, C, 8); const sd = dot(s, 6, '#ffd27a');
+    el('circle', { cx: C + 40, cy: C - 112, r: 1.6, class: 'hstar' }, s); el('circle', { cx: C - 52, cy: C - 108, r: 1.4, class: 'hstar' }, s);
+    el('ellipse', { cx: C - 6, cy: C - 118, rx: 12, ry: 5, class: 'hpath' }, s); const st = dot(s, 3.5, '#fff', 'hglow');
+    cap.textContent = 'A yearly wobble of the eighth sphere, locked to the Sun (×20,000)';
+    anim = t => { const a = t * .7; at(sd, C + Math.cos(a) * 42, C - Math.sin(a) * 42); at(st, C - 6 + Math.cos(a) * 12, C - 118 - Math.sin(a) * 5); };
+  } else if (type === 'venus') {
+    s.setAttribute('aria-label', 'Venus’s flexing sphere reaching past the Sun’s, with Venus showing a full phase');
+    const vS = flexLine('hflex'), sS = flexLine('hflex sun'); earth(s, C, C, 8); const sd = dot(s, 7, '#ffd27a'), vd = dot(s, 4.5, '#fff3d6');
+    const ph = el('g', {}, s), phB = el('circle', { cx: 262, cy: 40, r: 16, fill: '#141826' }, ph), phL = el('path', { fill: '#fff3d6' }, ph); txt(s, 262, 70, 'Venus', 'tick', 'middle'); void phB;
+    cap.textContent = 'Beyond the Sun, Venus’s sphere reaches past the Sun’s: full phase';
+    anim = t => { const ae = t * .45, av = ae / .615, sx = 80 * Math.cos(ae), sy = 80 * Math.sin(ae), vx = sx + 58 * Math.cos(av), vy = sy + 58 * Math.sin(av);
+      const dV = Math.hypot(vx, vy), thV = Math.atan2(vy, vx), thS = Math.atan2(sy, sx), fV = th => 46 + (dV - 46) * bump(th, thV, .32), fS = th => Math.max(80, fV(th) + 9);
+      vS.setAttribute('d', curvePath(fV)); sS.setAttribute('d', curvePath(fS)); at(sd, C + sx, C - sy); at(vd, C + vx, C - vy);
+      const k = (1 + ((-vx) * (sx - vx) + (-vy) * (sy - vy)) / (dV * 58)) / 2, r = 16, e = Math.abs(2 * k - 1) * r, cx = 262, cy = 40;
+      phL.setAttribute('d', `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r} A ${e} ${r} 0 0 ${k > .5 ? 1 : 0} ${cx} ${cy - r} Z`); };
+  } else if (type === 'solar') {
+    s.setAttribute('aria-label', 'Mars looping backward exactly when the Sun is opposite');
+    const tr = curve(s, 'htrail'); earth(s, C, C, 8); const sl = el('line', { class: 'hsight' }, s), sd = dot(s, 6, '#ffd27a'), md = dot(s, 4, '#ff9d6e');
+    const R = d => 40 + 48 * Math.log(d / .4), mars = tt => { const ae = tt * .5, am = ae / 1.881, mx = 1.524 * Math.cos(am) - Math.cos(ae), my = 1.524 * Math.sin(am) - Math.sin(ae), d = Math.hypot(mx, my), th = Math.atan2(my, mx); return [C + Math.cos(th) * R(d), C - Math.sin(th) * R(d)]; };
+    cap.textContent = 'Mars loops when the Sun is opposite: the link is the Sun’s gravity';
+    anim = t => { const ae = t * .5, sx = C - Math.cos(ae) * 62, sy = C + Math.sin(ae) * 62; at(sd, sx, sy); sl.setAttribute('x1', C); sl.setAttribute('y1', C); sl.setAttribute('x2', sx); sl.setAttribute('y2', sy);
+      const [mx, my] = mars(t); at(md, mx, my); tr.draw(mars, t - 22, t, 260); };
+  } else if (type === 'ellipse') {
+    s.setAttribute('aria-label', 'The true ellipse of Mars against a circle, with the gap between them');
+    const a = 110, e = .28, b = a * Math.sqrt(1 - e * e), cx = C - a * e * .5, fx = cx + a * e;
+    el('circle', { cx: fx - a * e / 2, cy: C, r: a, class: 'hring' }, s); el('ellipse', { cx, cy: C, rx: a, ry: b, class: 'hring hi' }, s); sun(s, fx, C, 9);
+    const gap = el('line', { class: 'hsight' }, s), ghost = dot(s, 3.5, 'rgba(158,196,255,.7)'), pd = dot(s, 5, '#ff9d6e', 'hglow');
+    cap.textContent = 'The ephemeris uses the true ellipse: the old 8′ gap is gone (exaggerated)';
+    anim = t => { const M = (t * .45) % TAU; let E = M; for (let k = 0; k < 10; k++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+      const x = cx + a * Math.cos(E), y = C - b * Math.sin(E), gx = fx - a * e / 2 + a * Math.cos(M), gy = C - a * Math.sin(M);
+      at(pd, x, y); at(ghost, gx, gy); gap.setAttribute('x1', x); gap.setAttribute('y1', y); gap.setAttribute('x2', gx); gap.setAttribute('y2', gy); };
+  } else if (type === 'frame') {
+    s.setAttribute('aria-label', 'A uniform yearly field carrying the Sun around a still Earth, and a pendulum turning with the frame');
+    ring(s, C, C, 100); const arrows = el('g', {}, s);
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) { if (!i && !j) continue; el('path', { d: `M${C + i * 44 - 9} ${C + j * 44} L${C + i * 44 + 9} ${C + j * 44} M${C + i * 44 + 4} ${C + j * 44 - 4} L${C + i * 44 + 9} ${C + j * 44} L${C + i * 44 + 4} ${C + j * 44 + 4}`, class: 'hfield', 'data-x': C + i * 44, 'data-y': C + j * 44 }, arrows); }
+    earth(s, C, C, 10); const pend = el('line', { class: 'hpend' }, s), sd = dot(s, 7, '#ffd27a');
+    cap.textContent = 'The yearly field carries the Sun; the turning frame turns the pendulum';
+    anim = t => { const a = t * .5, sx = C + Math.cos(a) * 100, sy = C - Math.sin(a) * 100; at(sd, sx, sy);
+      const dir = Math.atan2(-(C - sy), C - sx) * 180 / Math.PI;   // field points from the Sun towards Earth
+      arrows.querySelectorAll('path').forEach(p => p.setAttribute('transform', `rotate(${-dir} ${p.dataset.x} ${p.dataset.y})`));
+      const pa = t * .35; pend.setAttribute('x1', C - Math.cos(pa) * 18); pend.setAttribute('y1', C - Math.sin(pa) * 18); pend.setAttribute('x2', C + Math.cos(pa) * 18); pend.setAttribute('y2', C + Math.sin(pa) * 18); };
+  } else if (type === 'rosette') {
+    s.setAttribute('aria-label', 'A slowly turning ellipse: perihelion advance, exaggerated');
+    const a = 100, e = .45, b = a * Math.sqrt(1 - e * e); sun(s, C, C, 9);
+    const ghosts = [0, 1, 2].map(k => el('ellipse', { rx: a, ry: b, class: 'hring', opacity: .35 + k * .2 }, s)), cur = el('ellipse', { rx: a, ry: b, class: 'hring hi' }, s), pd = dot(s, 5, '#e8ecff', 'hglow');
+    cap.textContent = 'Mutual pulls and Mercury’s 43″ a century are in the ephemeris (exaggerated)';
+    anim = t => { const w = t * .12; const setE = (n, ang) => n.setAttribute('transform', `translate(${C} ${C}) rotate(${-ang * 180 / Math.PI}) translate(${-a * e} 0)`);
+      ghosts.forEach((g, k) => setE(g, w - (3 - k) * .35)); setE(cur, w);
+      const M = (t * .9) % TAU; let E = M; for (let k = 0; k < 10; k++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+      const x = a * Math.cos(E) - a * e, y = b * Math.sin(E), cw = Math.cos(w), sw = Math.sin(w); at(pd, C + x * cw + y * sw, C - x * sw + y * cw); };
+  } else if (type === 'bending') {
+    s.setAttribute('aria-label', 'Starlight bent by the Sun: not yet applied in the model');
+    sun(s, C, C, 26); el('circle', { cx: 18, cy: C - 34, r: 3, fill: '#fff' }, s); earth(s, 284, C - 34, 6);
+    el('line', { x1: 18, y1: C - 34, x2: 284, y2: C - 34, class: 'hsight2' }, s);
+    const bent = el('path', { d: `M18 ${C - 34} Q ${C} ${C - 22} 284 ${C - 34}`, class: 'hbent' }, s), ph = dot(s, 3, '#ffd9a0');
+    txt(s, C, 66, '○ open in the model', 'hlab hwarn', 'middle'); cap.textContent = '1.75″ at the Sun’s edge: not yet applied (bending exaggerated)';
+    anim = t => { const L = bent.getTotalLength(), p = bent.getPointAtLength((t * 70) % L); at(ph, p.x, p.y); };
+  } else if (type === 'depth') {
+    s.setAttribute('aria-label', 'Stars and galaxies at their measured distances inside the eighth sphere');
+    earth(s, C, C, 7); const g = el('g', {}, s); let q = 5; const r = () => ((q = (q * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let k = 0; k < 160; k++) { const a = r() * TAU, rr = 50 + Math.pow(r(), .8) * 92; el('circle', { cx: C + Math.cos(a) * rr, cy: C + Math.sin(a) * rr, r: rr > 120 ? .9 : 1.3, fill: rr > 120 ? '#c9b8ff' : '#e8ecff', opacity: .8 }, g); }
+    [[50, '4 ly'], [95, '1,000 ly'], [140, 'galaxies · to 46 Gly']].forEach(([rr, l]) => { ring(s, C, C, rr); txt(s, C + 4, C - rr - 3, l, 'tick'); });
+    cap.textContent = 'Stars and galaxies at their measured distances (log scale)';
+    anim = t => rot(g, (t * 3) % 360, C, C);
+  } else if (type === 'none') {
+    s.setAttribute('aria-label', 'Nothing to fix');
+    el('circle', { cx: C, cy: 128, r: 52, class: 'hring hi' }, s); const ck = el('path', { d: `M${C - 24} 128 L${C - 6} 146 L${C + 28} 110`, class: 'hcheck' }, s);
+    txt(s, C, 222, 'Nothing to fix', 'hlab big', 'middle'); cap.textContent = 'The model is general relativity, written for a still Earth';
+    let L = 0; anim = t => { if (!L) L = ck.getTotalLength(); ck.style.strokeDasharray = L; ck.style.strokeDashoffset = L * Math.max(0, 1 - ((t % 6) / 1.4)); };
+  } else if (type === 'agree') {
+    s.setAttribute('aria-label', 'The nested spheres agree with the barycentric calculation');
+    const c1 = el('circle', { cx: C - 30, cy: 128, r: 56, class: 'hring hi' }, s), c2 = el('circle', { cx: C + 30, cy: 128, r: 56, class: 'hflex sun' }, s);
+    txt(s, C - 70, 52, 'barycentric', 'tick', 'middle'); txt(s, C + 70, 52, 'nested spheres', 'tick', 'middle');
+    const v = txt(s, C, 236, '', 'hlab big', 'middle'); cap.textContent = 'Directions within 2.2 mas; distances within 1 part in 10⁸';
+    anim = t => { const f = Math.min(1, (t % 7) / 2.5), e = 1 - Math.pow(1 - f, 3); c1.setAttribute('cx', C - 30 * (1 - e)); c2.setAttribute('cx', C + 30 * (1 - e)); v.textContent = f < 1 ? '' : 'They coincide'; };
+  }
+  return { s, anim };
+}
+B.forEach(b => { const ty = FIXTYPE[b.title]; if (!ty) return; const vis1 = b.vis;
+  b.vis = function (v) { vis1.call(this, v); const past = v.querySelector('svg.hsvg'), card = v.querySelector('.hev'); if (!past) return;
+    const pair = document.createElement('div'); pair.className = 'hpair'; v.insertBefore(pair, past);
+    const pp = document.createElement('div'); pp.className = 'hpast'; pp.innerHTML = '<h5>The model then</h5>'; pp.appendChild(past); pair.appendChild(pp);
+    const fp = document.createElement('div'); fp.className = 'hfix'; fp.innerHTML = '<h5>In the nested, flexing spheres</h5>'; const { s, anim } = fixScene(ty); const capT = s.querySelector('text[y="292"]'); fp.appendChild(s); if (capT) { const pc = document.createElement('p'); pc.className = 'hfixcap'; pc.textContent = capT.textContent; capT.remove(); fp.appendChild(pc); } pair.appendChild(fp);
+    if (card) v.appendChild(card);
+    const a0 = this.anim; this.anim = (t, dt, sc) => { if (a0) a0.call(this, t, dt, sc); anim(t); }; }; });
 
 let story = null;
 export function openHistory() {

@@ -9,6 +9,7 @@ import { createScaleZoom, fmtLength, fmtLightTime } from './scale.js';
 import { openTour } from './tour.js';
 import { openHistory } from './history.js';
 import { openWhatIf } from './whatif.js';
+import { smoothWheel } from './smooth.js';
 
 const A = window.Astronomy;
 const getJSON = u => fetch(u).catch(()=>{ throw new Error(`Could not download ${u}`); }).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
@@ -33,7 +34,7 @@ const INTELLECTS = [
 ];
 const HNOTE = {
   Moon:'Governs the Moon’s sphere and the world of generation and corruption beneath it. In the Ṭayyibī ḥaqāʾiq the tenth is Adam al-Rūḥānī, who fell from the third rank to the tenth and became the mudabbir of the physical world.',
-  Muhit:'Begins past the particle horizon, 46 billion light-years away: the farthest distance from which any signal could ever have reached us. Nothing beyond it can be observed, so its thickness neither confirms nor breaks any law. Here its outer face is drawn 10^1000 times farther than the observable edge, on the same logarithmic scale. In the Earth-fixed description its daily turn is the turning of the whole sky.',
+  Muhit:'Begins past the particle horizon, 46 billion light-years away: the farthest distance from which any signal could ever have reached us. Nothing beyond it can be observed, so its thickness neither confirms nor breaks any law. Here its outer face is drawn 10^1000 times farther than the observable edge, on the same logarithmic scale. In the Earth-fixed description its daily turn is the turning of the whole sky: it carries every sphere and drags the frames of motion with it, which is why a Foucault pendulum turns. This is a reading general relativity allows; what turns al-Muhit, and why inertia follows the distant universe, is left open.',
   Stars:'The sphere of the twelve buruj, every star, and every galaxy, out to the edge of the observable universe.',
 };
 const INT = Object.fromEntries(INTELLECTS.filter(i=>i.key).map(i=>[i.key,i]));
@@ -56,7 +57,7 @@ const TEX = {day:'textures/earth_day.jpg', night:'textures/earth_night.jpg', clo
   Mercury:'textures/mercury.jpg', Venus:'textures/venus.jpg', Sun:'textures/sun.jpg', Mars:'textures/mars.jpg', Jupiter:'textures/jupiter.jpg', Saturn:'textures/saturn.jpg', ring:'textures/saturn_ring.png',
   Io:'textures/io.jpg', Europa:'textures/europa.jpg', Ganymede:'textures/ganymede.jpg', Callisto:'textures/callisto.jpg', Titan:'textures/titan.jpg'};
 const OUTER = [ {key:'Uranus',R:14.3,col:[.6,.8,.85]}, {key:'Neptune',R:14.9,col:[.5,.6,.95]} ];
-const ELEMENTS = [ {ar:'الماء',tr:'Water',R:.95,c:0x3f6fb0}, {ar:'الهواء',tr:'Air',R:1.4,c:0x9fb7c9}, {ar:'النار',tr:'Fire',R:1.9,c:0xd9763c} ];
+const ELEMENTS = [ {ar:'التراب',tr:'Earth',t:.07}, {ar:'الماء',tr:'Water',t:.26}, {ar:'الهواء',tr:'Air',t:.55}, {ar:'النار',tr:'Fire',t:.86} ];   // t: place between Earth's surface (0) and the sphere of the Moon (1)
 
 // ---------- measured-distance radial scale (monotone, log) ----------
 const GB = 0.035, GA = (12.8 - RE)/Math.log(1 + 9.6/GB);
@@ -255,6 +256,8 @@ const flexShells=BODIES.map(b=>{ const geo=flexGeo0.clone(); geo.setAttribute('a
   const m=new THREE.Mesh(geo, flexMatOf()); m.frustumCulled=false; m.visible=false; m.userData.key=b.key; prec.add(m);
   const cap=new THREE.Mesh(capGeo0.clone(), m.material); cap.frustumCulled=false; cap.visible=false; prec.add(cap); m.userData.cap=cap; return m; });
 const fK=new Float64Array(7), fRho=new Float64Array(7), fU=new Float64Array(21), fC2=new Float64Array(7);
+// outer edge of the four elements: just inside the sphere of the Moon, in whichever geometry is showing
+const elemOuter=()=>{ const flexMoon=RE+GA*Math.log(1+.00243/GB); return (flexMoon*.98)*(1-state.u)+2.25*state.u; };
 function flexRho(i){ let lo=RHO_E+(i+1)*FLEX_D; for(let j=0;j<=i;j++){ const t=fRho[j]+(i-j)*FLEX_D-fK[j]*fC2[j]; if(t>lo) lo=t; }
   let up=1e9; for(let l=i;l<7;l++){ const t=fRho[l]-(l-i)*FLEX_D+fK[l]*fC2[l]; if(t<up) up=t; }
   return Math.min(up, Math.max(lo, FLEX_BASE[i])); }
@@ -290,7 +293,30 @@ window.__flexCheck=()=>{ // verifies: each sphere passes through its body; spher
   return {worstMiss, crossings, k:[...fK].map(x=>+x.toFixed(1))}; };
 const starShell = new THREE.Mesh(new THREE.SphereGeometry(R_STARS, 128, 64), shellMat(0x8aa0ff, .5));
 starShell.quaternion.copy(ECL_Q); starShell.userData.base=.5; prec.add(starShell);
-const elemShells = ELEMENTS.map(e=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(e.R,64,32), shellMat(e.c,.8)); m.userData.base=.8; m.visible=false; prec.add(m); return m; });
+const elemShells = [];
+// the four elements of the sublunar world, earth, water, air and fire, as one volume whose layers merge without boundaries:
+// each pixel integrates colour along its line of sight through the shell between Earth's surface and the sphere of the Moon
+const elemVol = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 36), new THREE.ShaderMaterial({
+  uniforms:{ uC:{value:new THREE.Vector3()}, uR:{value:2.25}, uRE:{value:RE}, uT:{value:0}, uOp:{value:1} },
+  vertexShader:`varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+  fragmentShader:`uniform vec3 uC; uniform float uR, uRE, uT, uOp; varying vec3 vW;
+    void main(){
+      vec3 ro=cameraPosition, rd=normalize(vW-ro), oc=ro-uC; float b=dot(oc,rd), c=dot(oc,oc)-uR*uR, h=b*b-c; if(h<=0.) discard; h=sqrt(h);
+      float t0=max(-b-h,0.), t1=-b+h; float he=b*b-(dot(oc,oc)-uRE*uRE); if(he>0.){ float te=-b-sqrt(he); if(te>0.) t1=min(t1,te); }
+      if(t1<=t0) discard;
+      vec3 cE=vec3(.52,.36,.2), cW=vec3(.12,.4,1.), cA=vec3(.62,.8,1.), cF=vec3(1.,.4,.08);
+      vec3 acc=vec3(0.); float a=0.; const int N=36; float dt=(t1-t0)/float(N), th=uR-uRE;
+      for(int i=0;i<N;i++){ vec3 p=ro+rd*(t0+(float(i)+.5)*dt); vec3 q=p-uC; float r=length(q), t=(r-uRE)/th;
+        if(t<0.||t>1.) continue;
+        float fl=.85+.15*sin(uT*1.7+q.x*9.+q.y*7.)*sin(uT*1.1+q.z*8.);
+        float we=exp(-pow((t-.05)/.08,2.)), ww=exp(-pow((t-.26)/.15,2.)), wa=exp(-pow((t-.55)/.17,2.)), wf=exp(-pow((t-.86)/.13,2.))*fl;
+        float s=we+ww+wa+wf+1e-4; vec3 col=(we*cE+ww*cW+wa*cA+wf*cF)/s;
+        float dens=(we*1.4+ww*1.1+wa*.55+wf*1.25)*smoothstep(1.,.88,t);
+        float w=clamp(dens*dt/th*.42,0.,1.); acc+=col*w*(1.-a); a+=w*(1.-a); }
+      if(a<.003) discard;
+      gl_FragColor=vec4(acc/a*.85, min(.62,a*1.1)*uOp); }`,
+  transparent:true, depthWrite:false, depthTest:false, side:THREE.BackSide }));
+elemVol.visible=false; elemVol.renderOrder=5; scene.add(elemVol);
 
 function ringLine(R, color, opacity){
   const pts=[]; const eps=23.4393*DEG;
@@ -816,7 +842,18 @@ const TICKS=[['Moon','1.3 light-seconds',AUr(.00257)],['Sun','8.3 light-minutes'
   ['al-Muhit, inner face','beyond all observation',R_MI],['al-Muhit, outer face','10^1000 × the observable universe on this scale',R_MO]]
   .map(([a,b,r])=>({r, el:mk('rt',`${a?`<b>${a}</b> · `:''}${b}`)}));
 const rulerLine=document.getElementById('ruler-line');
-const elemLbls=ELEMENTS.map(e=>({R:e.R, el:mk('slbl',`${e.ar}<i>${e.tr}</i>`)}));
+const elemLbls=ELEMENTS.map(e=>({t:e.t, el:mk('slbl',`${e.ar}<i>${e.tr}</i>`)}));
+// ---------- what holds Earth still: the Sun's and Moon's pull, balanced exactly by the field of the sky's yearly swing ----------
+// (in free-fall terms: the net force at Earth's centre is zero), and Earth's own magnetic field, which shields but does not hold
+const holdGroup=new THREE.Group(); holdGroup.visible=false; scene.add(holdGroup);
+const mkArrow=c=>{ const a=new THREE.ArrowHelper(new THREE.Vector3(1,0,0),new THREE.Vector3(),1,c,.16,.09); for(const m of [a.line.material,a.cone.material]){ m.transparent=true; m.depthTest=false; m.opacity=.95; } a.renderOrder=8; holdGroup.add(a); return a; };
+const arSun=mkArrow(0xffd27a), arMoon=mkArrow(0xd8dbe6), arField=mkArrow(0x9ec4ff);
+const magGroup=new THREE.Group(); earth.add(magGroup); magGroup.visible=false;
+{ const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),9.4*DEG), mat=new THREE.LineBasicMaterial({color:0x7fe0c8,transparent:true,opacity:.28,depthWrite:false});
+  for(const L of [1.7,2.3,3.1]) for(let k=0;k<6;k++){ const ph=k/6*Math.PI*2, pts=[];
+    for(let q=8;q<=172;q+=4){ const th=q*DEG, r=L*Math.sin(th)**2; if(r<1.02) continue; pts.push(new THREE.Vector3(r*Math.sin(th)*Math.cos(ph), r*Math.cos(th), r*Math.sin(th)*Math.sin(ph)).multiplyScalar(RE).applyQuaternion(tilt)); }
+    if(pts.length>2) magGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat)); } }
+const holdLbls=[['s','Pull of the Sun · 5.93 mm/s²'],['m','Pull of the Moon · 0.03 mm/s² (arrow enlarged)'],['f','Field of the sky’s yearly swing · equal and opposite'],['g','Earth’s magnetic field · shields it, does not hold it']].map(([k,t])=>({k, el:mk('slbl hold',t)}));
 for(const z of zodLabels) z.el=mk('zlbl',z.html);
 for(const s of signLabels) s.el=mk('zlbl',s.html);
 const starLbls=SKY.names.map(([i,name])=>({pos:new THREE.Vector3(sDir[i*3],sDir[i*3+1],sDir[i*3+2]).multiplyScalar(sRad[i]), el:mk('stlbl',name)}));
@@ -1039,7 +1076,8 @@ layer('l-milky',v=>milky.visible=v);
 layer('l-zod',v=>{zodGroup.visible=v; state.showZod=v;});
 layer('l-signs',v=>{signGroup.visible=v; state.showSigns=v;});
 layer('l-stars',v=>state.showStarNames=v);
-layer('l-elem',v=>{elemShells.forEach(m=>m.visible=v); state.showElem=v;});
+layer('l-hold',v=>{ holdGroup.visible=v; magGroup.visible=v; state.showHold=v; if(v && state.intro===null) toast('Earth stays still because the forces on it balance: the pull of the Sun and Moon is matched exactly by the field of the sky’s yearly swing, so the net force at its centre is zero. Classical authors pictured this as iron held among magnets. Earth’s real magnetic field shields it from the solar wind but does not hold it in place.',9000); });
+layer('l-elem',v=>{elemVol.visible=v; state.showElem=v; if(v && state.uTarget<.5 && state.intro===null) toast('The four elements fill the sublunar region. With measured distances the Moon is close, so the layer is thin; switch to round spheres to see it fully.',5200);});
 layer('l-outer',v=>OUTER.forEach(o=>o.mesh.visible=v));
 layer('l-glow',v=>bloom.enabled=v);
 layer('l-gal',v=>{ galaxies.visible=v; objects.visible=v; });
@@ -1134,6 +1172,7 @@ function tick(now){
   W.fromArray(eD).applyMatrix4(prec.matrixWorld); earth.position.copy(W);
   earth.scale.setScalar(es);
   for(const s of [...planetShells, ...elemShells]){ s.position.fromArray(eD); s.material.uniforms.uA.value=s.userData.base*state.u*(s.userData.iv??1); }
+  if(elemVol.visible){ const es2=earth.scale.x; elemVol.position.copy(earth.position); elemVol.scale.setScalar(elemOuter()*es2); const u=elemVol.material.uniforms; u.uC.value.copy(earth.position); u.uR.value=elemOuter()*es2; u.uRE.value=RE*es2; u.uT.value=state.time; }
   starShell.position.fromArray(eD); starShell.material.uniforms.uA.value=starShell.userData.base*(1-state.c)*(starShell.userData.iv??1);
   { const fa=(1-state.u)*(state.showShells?1:0); const on=fa>.01;
     flexShells.forEach(m=>{ m.visible=on; m.userData.cap.visible=on; m.material.uniforms.uA.value=.7*fa; m.material.uniforms.uHi.value = m.userData.key===state.sel?1:0; });
@@ -1206,7 +1245,17 @@ function tick(now){
       W.copy(rd).multiplyScalar(R_MO); V.copy(W).project(camera); let x2=(V.x+1)/2*W_, y2=(1-V.y)/2*H_;
       if(V.z>1){ x2=x1+(x1-x2)*-50; y2=y1+(y1-y2)*-50; }
       rulerLine.setAttribute('x1',x1); rulerLine.setAttribute('y1',y1); rulerLine.setAttribute('x2',x2); rulerLine.setAttribute('y2',y2); } }
-  for(const s of elemLbls){ W.copy(dir).multiplyScalar(s.R*es).add(EW); place(s.el,W,nameOK && state.showElem); }
+  if(holdGroup.visible){ const es3=earth.scale.x, sw=new THREE.Vector3(), mw=new THREE.Vector3(); holdGroup.position.copy(earth.position);
+    bodyWorld('Sun',sw).sub(earth.position).normalize(); bodyWorld('Moon',mw).sub(earth.position).normalize();
+    const Ls=1.25*es3, Lm=.42*es3, sum=sw.clone().multiplyScalar(Ls).addScaledVector(mw,Lm), Lf=sum.length(), fd=sum.clone().multiplyScalar(-1/Lf);
+    const off=RE*1.08*es3;
+    arSun.position.copy(sw).multiplyScalar(off); arSun.setDirection(sw); arSun.setLength(Ls,.16*es3,.09*es3);
+    arMoon.position.copy(mw).multiplyScalar(off); arMoon.setDirection(mw); arMoon.setLength(Lm,.12*es3,.07*es3);
+    arField.position.copy(fd).multiplyScalar(off); arField.setDirection(fd); arField.setLength(Lf,.16*es3,.09*es3);
+    const tip=(a,d,L)=>W.copy(d).multiplyScalar(off+L).add(earth.position);
+    for(const h of holdLbls){ if(h.k==='s') tip(arSun,sw,Ls); else if(h.k==='m') tip(arMoon,mw,Lm); else if(h.k==='f') tip(arField,fd,Lf); else W.set(0,RE*3.2*es3,0).add(earth.position); place(h.el,W,state.intro===null); } }
+  else for(const h of holdLbls) place(h.el,W,false);
+  for(const s of elemLbls){ W.copy(dir).multiplyScalar((RE+s.t*(elemOuter()-RE))*es).add(EW); place(s.el,W,nameOK && state.showElem); }
   for(const z of zodLabels){ W.copy(z.pos).applyMatrix4(prec.matrixWorld); place(z.el,W,(state.intro!==null || state.showZod) && !state.far); }
   for(const s of signLabels){ W.copy(s.pos).applyMatrix4(sky.matrixWorld); place(s.el,W,state.showSigns && !state.far); }
   for(const s of starLbls){ W.copy(s.pos).applyMatrix4(prec.matrixWorld); place(s.el,W,state.showStarNames); }
@@ -1373,7 +1422,7 @@ const STATEMENT='No law of physics or mathematics is broken here: it is the same
 const BEATS=[
  {layout:'title', html:`<h1 class="hero">The universe, through a different lens</h1><p class="lede">A still Earth at the centre of nine nested spheres, with every planet, star and galaxy exactly where telescopes measure it.</p><p class="statement">${STATEMENT}</p>`, d:34},
  {layout:'center', html:'<p class="lede big">Somewhere in this darkness is a small blue point of light.</p>', d:34},
- {layout:'side', key:'earth', kicker:'The centre', title:'Earth', body:'In this model it holds still. Every distance is measured from here, and every direction is the direction a telescope on Earth would point.', data:()=>[['Diameter','12,742 km'],['State','At rest']], ill:()=>svgMarble, d:2.1, m:()=>6.371e6},
+ {layout:'side', key:'earth', kicker:'The centre', title:'Earth', body:'In this model it holds still, kept in place by balance: the pull of the Sun and Moon is matched exactly by the field of the sky’s yearly swing. Every distance is measured from here, and every direction is the direction a telescope on Earth would point.', data:()=>[['Diameter','12,742 km'],['State','At rest']], ill:()=>svgMarble, d:2.1, m:()=>6.371e6},
  {layout:'side', body_:'Moon', body:'The nearest sphere, turning once a month.', kicker:'Sphere 1 · فلك القمر', title:'The Moon', n:1, d:6.6},
  {layout:'side', body_:'Mercury', body:'The swiftest planet, never far from the Sun.', kicker:'Sphere 2 · فلك عطارد', title:'Mercury', n:2, d:10.6},
  {layout:'side', body_:'Venus', body:'The brightest planet. It shows phases like the Moon, and the model reproduces every one of them.', kicker:'Sphere 3 · فلك الزهرة', title:'Venus', n:3, d:14.6},
@@ -1390,7 +1439,7 @@ const BEATS=[
  {layout:'side', key:'z4', zoom:[17.05,22.75], kicker:'True scale · the galaxy', title:'A hundred thousand light-years', body:'Every naked-eye star sits in a tiny patch around the Sun, inside a galaxy about 100,000 light-years across. The spiral drawn here is representative; the galaxies around it are real catalogue entries.', data:()=>[['To the galactic centre','27,000 light-years'],['Andromeda','2.5 million light-years'],['Galaxies placed','9,879']], d:245},
  {layout:'side', key:'z5', zoom:[22.75,26.86], kicker:'True scale · the edge', title:'Forty-six billion light-years', body:'Catalogued galaxies thin out near two billion light-years; beyond them the galaxies shown are representative. The farthest light we receive left its source 13.8 billion years ago. At this scale, everything out to Saturn is smaller than a single proton.', data:()=>[['To the edge','46.3 billion light-years'],['Earth radii','7 × 10¹⁹'],['On a linear map','Saturn < a proton']], d:245},
  {layout:'side', key:'log', kicker:'How it all fits', title:'Twenty powers of ten', body:'That is why the model compresses depth. Each ten-fold step outward takes the same space on the map, so Earth and the farthest galaxies fit on one screen. Directions are never changed; only depth is compressed.', ill:()=>svgLog, d:262, m:()=>4.38e26},
- {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere. In this description the whole sky turns with it once a day. It begins where observation ends, so no measurement can confirm it or rule it out.', ill:()=>svgMuhit, data:()=>[['Thickness drawn','10¹⁰⁰⁰ × the edge'],['Turns','Once a sidereal day']], n:9, d:VIEW_MUHIT, m:()=>1e30},
+ {layout:'side', key:'muhit', kicker:'Sphere 9 · الفلك المحيط', title:'al-Falak al-Muhit', body:'The outermost sphere: starless, encompassing everything. It turns once every sidereal day, 23 h 56 min, and its turning is what moves the spheres. It carries the Moon, the Sun, the planets and the stars around a still Earth, and it drags the very frames in which motion is measured, so a pendulum’s swing and a gyroscope’s aim turn with the sky. Each sphere’s own slower motion, the Moon’s month and the planets’ paths, rides within that daily turn. Physics allows this reading: it is general relativity written for a still Earth. What turns al-Muhit, and why inertia follows the distant universe, physics cannot yet say. It begins where observation ends, so no measurement can confirm or rule it out.', ill:()=>svgMuhit, data:()=>[['Turns','Once a sidereal day'],['Carries','Every sphere, and the frames of motion'],['What turns it','An open question']], n:9, d:VIEW_MUHIT, m:()=>1e30},
  {layout:'title', key:'enter', html:`<h2 class="hero sm">Nine spheres. One sky.</h2><p class="statement">${STATEMENT}</p><div class="ctas"><button class="enter" id="intro-enter">Continue to the model</button></div><div class="lnks"><button class="lnk" id="intro-tour">See what it can do, and how accurately</button><button class="lnk" id="intro-calc">Calculate and verify positions</button><button class="lnk" id="intro-read">How it compares with the heliocentric model</button><a class="lnk" href="paper.html" target="_blank" rel="noopener">Read the paper</a></div>`, d:30},
 ];
 BEATS.forEach(b=>{ if(b.body_){ b.body2=b.body_; b.data=()=>liveData(b.body2); if(!b.ill) b.ill=()=>svgSpheres(b.n); } else if(b.n && !b.ill) b.ill=()=>svgSpheres(b.n); });
@@ -1423,7 +1472,9 @@ const irTrack=irEl.querySelector('#ir-track'), irLms=[];
   irLms.push({e:add('ir-lm muhit',lx(30),'al-Muhit'),L:29.5,on:false}); }
 const beatL = k => { const b=BEATS[k]; if(b.body2) return Math.log10(pos[b.body2].d*AU_M); if(b.m) return Math.log10(b.m()); return null; };
 const humanM = m => m<1e9 ? `${Math.round(m/1000).toLocaleString()} km` : m<1e14 ? `${(m/AU_M).toFixed(m<1.5e12?2:1)} AU` : fmtLy(m/9.4607e15);
+const beatOver=[], lastSv=[]; let irW=0, hintOp=''; addEventListener('resize',()=>{ irW=0; activeBeat=-2; });
 let introDir=null, filled=false, activeBeat=-1, lastL=null, lastOp=-1, viewShift=0, lastShift=null;
+smoothWheel(introEl);
 introEl.addEventListener('scroll',()=>{ const max=introEl.scrollHeight-introEl.clientHeight; state.introP=max>0? introEl.scrollTop/max : 0; },{passive:true});
 function fillBeats(){ BEATS.forEach((b,k)=>{ if(b.layout!=='side') return; const el=beatEls[k];
   if(b.data) el.querySelector('.data').innerHTML=b.data().map(([t,v])=>`<div><dt>${t}</dt><dd>${v}</dd></div>`).join('');
@@ -1446,7 +1497,7 @@ function beatView(k){ const b=BEATS[k], sway=Math.sin(state.time*.12)*.03;
   const base = k<=2 ? introDir.clone() : HOME.clone().normalize();
   return {dir:base.applyAxisAngle(_UP, state.time*.02), target:new THREE.Vector3(), dist:b.d}; }
 function introCamera(dt){
-  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*7);
+  const p = state.intro = state.intro + (state.introP-state.intro)*Math.min(1,dt*9);
   if(!filled) fillBeats();
   if(!introDir){ // look at Earth's sunlit side, a little from above
     const sw=new THREE.Vector3(...sunNow).applyMatrix3(new THREE.Matrix3().setFromMatrix4(prec.matrixWorld)).normalize();
@@ -1454,9 +1505,12 @@ function introCamera(dt){
   const x=p*NB, i=Math.min(NB-1,Math.floor(x)), s=Math.min(1,x-i);
   // text: one beat is on at a time; CSS handles the staggered entrance and the exit
   const on = (i===0 && s<.92) || (i===NB-1 && s>.03) || (s>.03 && s<.96) ? i : -1;
-  if(on!==activeBeat){ beatEls.forEach((el,k)=>el.classList.toggle('on',k===on)); activeBeat=on; }
-  beatEls[i].style.setProperty('--s', s.toFixed(3));   // gentle parallax of the text within each beat
-  $('intro-hint').style.opacity = p<.004 ? 1 : 0;
+  if(on!==activeBeat){ beatEls.forEach((el,k)=>el.classList.toggle('on',k===on)); activeBeat=on;
+    if(on>=0){ const el=beatEls[on]; el.style.transform=''; el.classList.remove('tall'); const o=el.scrollHeight-el.clientHeight;   // content taller than the screen: let it glide up while the beat is held
+      if(o>4){ el.classList.add('tall'); beatOver[on]=el.scrollHeight-el.clientHeight+30; } else beatOver[on]=0; } }
+  if(on>=0 && beatOver[on]){ const f=Math.min(1,Math.max(0,(s-.14)/.7)); beatEls[on].style.transform=`translate3d(0,${(-beatOver[on]*f).toFixed(1)}px,0)`; }
+  { const sv=s.toFixed(3); if(sv!==lastSv[i]){ beatEls[i].style.setProperty('--s', sv); lastSv[i]=sv; } }   // gentle parallax of the text within each beat
+  { const ho = p<.004 ? '1' : '0'; if(ho!==hintOp){ $('intro-hint').style.opacity=ho; hintOp=ho; } }
   // frame the model: on wide screens it moves to the right while text occupies the left
   const side = BEATS[i].layout==='side' ? 1 : 0, wide=sideLayout();
   viewShift += (side-viewShift)*Math.min(1,dt*4);
@@ -1497,7 +1551,7 @@ function introCamera(dt){
     else { const L1=beatL(i), L0=beatL(Math.max(0,i-1)) ?? L1; L = L1===null ? 6.8 : L0+(L1-L0)*e; }
     L=Math.round(L*100)/100;
     if(L!==lastL){ lastL=L;
-      $('ir-mk').style.transform=`translateX(${lx(L)*irTrack.clientWidth}px)`;
+      if(!irW) irW=irTrack.clientWidth; $('ir-mk').style.transform=`translateX(${lx(L)*irW}px)`;
       irLms.forEach(o=>{ const v=L>=o.L-.02; if(v!==o.on){ o.e.classList.toggle('on',v); o.on=v; } });
       if(L<=27.05){ $('ir-num').innerHTML=`10<sup>${L.toFixed(1)}</sup> m`; $('ir-txt').textContent=humanM(Math.pow(10,L)); }
       else { $('ir-num').innerHTML='edge × 10<sup>1000</sup>'; $('ir-txt').textContent='the outer face of al-Muhit'; } } }
@@ -1519,7 +1573,7 @@ function applyIntroVis(t){
   const fE=appear(bIndex('edge')); for(const o of [deep,landmarks]){ o.visible=fE>.01; o.material.uniforms.uFade.value=fE; }
   cmb.visible=fE>.3; horizon.visible=fE>.3;
   muhitGroup.visible=appear(bIndex('muhit'))>.05;
-  for(const o of [fabric, sightLine, sunLine, chordLine, ...dispLines, signGroup, earthTrail.line, ...elemShells]) o.visible=false;
+  for(const o of [fabric, sightLine, sunLine, chordLine, ...dispLines, signGroup, earthTrail.line, elemVol, holdGroup, magGroup]) o.visible=false;
   flexShells.forEach(m=>{ m.visible=false; m.userData.cap.visible=false; }); OUTER.forEach(o=>o.mesh.visible=false);
 }
 function enterModel(){ if(state.intro===null) return; state.intro=null;
@@ -1533,7 +1587,8 @@ function enterModel(){ if(state.intro===null) return; state.intro=null;
   state.playing=true; $('t-play').textContent='Pause';
   if(camera.position.length()>60) warpTo(30);
   setTimeout(()=>toast('Drag to turn · scroll to zoom · click any planet, star or galaxy',4500),900); }
-$('intro-enter').onclick=()=>openHistory();   // the history of models comes first, then the model $('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
+$('intro-enter').onclick=()=>openHistory();   // the history of models comes first, then the model
+$('intro-skip').onclick=()=>{ enterModel(); warpTo(30); };
 $('intro-calc').onclick=()=>{ enterModel(); openCalc(); };
 $('intro-tour').onclick=()=>openTour(); $('open-tour').onclick=()=>openTour(); $('open-history').onclick=()=>openHistory(); $('open-whatif').onclick=()=>openWhatIf();
 addEventListener('resize',()=>{ lastShift=null; lastL=null; });

@@ -20,6 +20,8 @@ An interactive, Earth-centred model of the universe. Nine nested spheres turn ar
 - **A calculator** that computes any planet, moon, star, comet or asteroid twice, once from this model's own geometry and once heliocentrically, and shows the difference, with geocentric and topocentric (observer) coordinates, altitude with refraction, and rise, culmination and set times; plus coming eclipses, transits, oppositions, seasons and lunar apsides, each checked inside the model, with links to NASA JPL Horizons for independent verification.
 - **A scientific paper** (`paper.html`) with the full mathematics, physics, data sources, validation results and a classification of what is observation, frame choice, visual device, approximation or fiction.
 - **A short physics article** comparing this model with the heliocentric one.
+- **al-Falak al-Muhit, the reading adopted:** its daily turn carries every sphere and drags the frames of motion with it (a reading general relativity allows); what turns it, and why inertia follows the distant universe, is left open.
+- **Layers** for the four elements (earth, water, air and fire merging without boundaries below the Moon) and for **what holds Earth still** (the Sun's and Moon's pull balanced by the field of the sky's yearly swing; Earth's magnetic field, which shields but does not hold).
 - An optional **Haqiqat layer** (the ten intellects and hudud after al-Kirmani), off by default and switched on in Settings.
 
 ## Running it locally
