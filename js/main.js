@@ -10,6 +10,7 @@ import { openTour } from './tour.js';
 import { openHistory } from './history.js';
 import { openWhatIf } from './whatif.js';
 import { smoothWheel } from './smooth.js';
+import { openTorus } from './torus.js';
 
 const A = window.Astronomy;
 const getJSON = u => fetch(u).catch(()=>{ throw new Error(`Could not download ${u}`); }).then(r=>{ if(!r.ok) throw new Error(`Could not load ${u} (${r.status})`); return r.json(); });
@@ -137,7 +138,8 @@ function dispEarth(s, out){
 // ---------- renderer ----------
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
-const DPR_MAX=Math.min(devicePixelRatio, 1.5); let dpr=Math.min(1.25, DPR_MAX);   // start modestly; raised when the device keeps up
+// sharp by default: full device resolution (up to 2x); lowered only if the device stays slow for several seconds
+const DPR_MAX=Math.min(devicePixelRatio||1, 2); let dpr=DPR_MAX;
 renderer.setPixelRatio(dpr);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 const scene = new THREE.Scene();
@@ -152,7 +154,9 @@ controls.enableDamping = true; controls.dampingFactor = .08;
 controls.minDistance = 0.06; controls.maxDistance = R_MO*4.5; controls.zoomSpeed = 1.3;
 controls.enablePan = true; controls.screenSpacePanning = true;
 
-const composer = new EffectComposer(renderer);
+// the post-processing chain draws into a multisampled target, so thin lines and sphere edges stay smooth (no jagged steps)
+const MSAA = renderer.capabilities.isWebGL2 ? (DPR_MAX>1.5 ? 2 : 4) : 0;
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth*dpr, innerHeight*dpr, {type:THREE.HalfFloatType, samples:MSAA}));
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(256,256), .55, .45, .9);
 { const set=bloom.setSize.bind(bloom); bloom.setSize=(w,h)=>set(Math.max(1,w/3),Math.max(1,h/3)); }
@@ -854,6 +858,15 @@ const magGroup=new THREE.Group(); earth.add(magGroup); magGroup.visible=false;
     for(let q=8;q<=172;q+=4){ const th=q*DEG, r=L*Math.sin(th)**2; if(r<1.02) continue; pts.push(new THREE.Vector3(r*Math.sin(th)*Math.cos(ph), r*Math.cos(th), r*Math.sin(th)*Math.sin(ph)).multiplyScalar(RE).applyQuaternion(tilt)); }
     if(pts.length>2) magGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat)); } }
 const holdLbls=[['s','Pull of the Sun · 5.93 mm/s²'],['m','Pull of the Moon · 0.03 mm/s² (arrow enlarged)'],['f','Field of the sky’s yearly swing · equal and opposite'],['g','Earth’s magnetic field · shields it, does not hold it']].map(([k,t])=>({k, el:mk('slbl hold',t)}));
+// ---------- the Sun's arms (Tycho's arrangement, the same sky as the Sun-centred picture) ----------
+// each planet rides on an arm from the Sun that turns steadily one way; the Sun carries every arm round the still Earth once a year
+const armGroup=new THREE.Group(); armGroup.visible=false; scene.add(armGroup);
+const ARMS=[['Moon','Earth','27.3 days'],['Mercury','Sun','88 days'],['Venus','Sun','225 days'],['Sun','Earth','a year'],['Mars','Sun','687 days'],['Jupiter','Sun','11.9 years'],['Saturn','Sun','29.5 years']].map(([k,from,P])=>{
+  const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));
+  const ln=new THREE.Line(geo,new THREE.LineBasicMaterial({color:new THREE.Color(...BMAP[k].col.map(x=>Math.min(1,x*1.15+.1))),transparent:true,opacity:.95,depthTest:false,depthWrite:false}));
+  ln.frustumCulled=false; ln.renderOrder=7; armGroup.add(ln);
+  const txt=k==='Sun'?'The Sun’s yearly circle · carries every arm':k==='Moon'?'The Moon’s arm, from Earth · 27.3 days · never reverses':`${BMAP[k].en}’s arm from the Sun · one turn in ${P} · never reverses`;
+  return {k,from,ln,el:mk('slbl arm',txt)}; });
 for(const z of zodLabels) z.el=mk('zlbl',z.html);
 for(const s of signLabels) s.el=mk('zlbl',s.html);
 // ---------- classical states of motion, houses, exaltation and fall ----------
@@ -963,6 +976,7 @@ function applyClassical(ut){ const C=updateClassical(ut);
     const html=s.html+`<small class="zh">house of ${own.join(' and ')}${ex.length?' · '+ex.join(', '):''}</small>`+(here.length?`<small class="zl">${here.join(', ')} at home here</small>`:'');
     if(s.el.innerHTML!==html){ s.el.innerHTML=html; } s.el.classList.toggle('lit',here.length>0); }); }
 function classicalCard(t){ const b=BMAP[state.sel], c=classical(b.key,t.ut), m=MOTION_TXT[c.motion];
+  $('cls-torus').hidden = b.key==='Sun'||b.key==='Moon';
   const rows=[['Ascent', `${c.asc?'ṣuʿūd, rising':'hubūṭ, descending'} · ${c.dd>=0?'+':'−'}${Math.abs(Math.round(c.dd)).toLocaleString()} km/day`]];
   if(b.key!=='Sun'&&b.key!=='Moon') rows.push(['Motion', `${m[0]}, ${m[1]}`]);
   rows.push(['In the sign of', `${SIGN_EN[c.sg]} ${c.deg.toFixed(1)}°${c.house?` · its own ${c.house[1]?c.house[1]+' ':''}house`:''}${c.exalt?' · its exaltation':''}${c.fall?' · its fall':''}`]);
@@ -1138,6 +1152,7 @@ layer('l-stars',v=>state.showStarNames=v);
 layer('l-hold',v=>{ holdGroup.visible=v; magGroup.visible=v; state.showHold=v; if(v && state.intro===null) toast('Earth stays still because the forces on it balance: the pull of the Sun and Moon is matched exactly by the field of the sky’s yearly swing, so the net force at its centre is zero. Classical authors pictured this as iron held among magnets. Earth’s real magnetic field shields it from the solar wind but does not hold it in place.',9000); });
 layer('l-asc',v=>{ state.showAsc=v; clsKey=''; if(!v){ [...planetShells,...flexShells].forEach(m=>m.material.uniforms.uC.value.set(0xc6d4ff)); BODIES.forEach(b=>{ const t=b.lbl.querySelector('.ctag'); if(t) t.remove(); }); signLabels.forEach((s,k)=>{ s.el.innerHTML=s.html; s.el.classList.remove('lit'); }); }
   else if(state.intro===null) toast('Rising (ṣuʿūd) spheres glow gold, descending (hubūṭ) spheres glow blue. Labels show istiqāma, wuqūf or rujūʿ, and the sign band shows each planet’s houses and exaltation.',6500); });
+layer('l-arms',v=>{ armGroup.visible=v; if(v && state.intro===null) toast('Each planet rides on an arm from the Sun that turns steadily, always the same way, and the Sun carries every arm round the still Earth once a year. A backward stretch is these two forward turnings added up, as seen from Earth. Open a planet’s card and choose “See the whole path” to watch it.',9000); });
 layer('l-elem',v=>{elemVol.visible=v; state.showElem=v; if(v && state.uTarget<.5 && state.intro===null) toast('The four elements fill the sublunar region. With measured distances the Moon is close, so the layer is thin; switch to round spheres to see it fully.',5200);});
 layer('l-outer',v=>OUTER.forEach(o=>o.mesh.visible=v));
 layer('l-glow',v=>bloom.enabled=v);
@@ -1173,6 +1188,7 @@ document.querySelectorAll('[data-ev]').forEach(btn=>btn.onclick=()=>{
 const VIEWS={planets:30, stars:105, galaxies:165, universe:240, muhit:1550};
 
 
+$('cls-torus').onclick=()=>openTorus(state.sel, state.ut);
 $('tab-right').onclick=()=>$('right').classList.toggle('min');
 
 function resize(){ W_=innerWidth; H_=innerHeight; renderer.setPixelRatio(dpr); composer.setPixelRatio(dpr); renderer.setSize(W_,H_,false); composer.setSize(W_,H_);
@@ -1181,7 +1197,10 @@ addEventListener('resize',resize); resize();
 
 // ---------- loop ----------
 const precM=new THREE.Matrix4(), nm3=new THREE.Matrix3(), eInv=new THREE.Quaternion();
-let last=performance.now(), readoutDue=0, frame=0, lastGeoKey=''; const perf={acc:0,n:0};
+let last=performance.now(), readoutDue=0, frame=0, lastGeoKey=''; const perf={acc:0,n:0,slow:0};
+// while the camera moves, background work (trails, comets, grids, readouts) waits, so the motion itself stays smooth
+const camPrev=new THREE.Vector3(), tgtPrev=new THREE.Vector3(); let lastMove=-1e9, busy=false, dragging=false;
+controls.addEventListener('start',()=>{ dragging=true; }); controls.addEventListener('end',()=>{ dragging=false; });
 const pad=n=>String(n).padStart(2,'0');
 const S=[[1,0,0],[0,0,1],[0,-1,0]], Si=[[1,0,0],[0,0,-1],[0,1,0]];
 const mul=(a,b)=>a.map(r=>b[0].map((_,j)=>r[0]*b[0][j]+r[1]*b[1][j]+r[2]*b[2][j]));
@@ -1189,8 +1208,15 @@ function tick(now){
   if(document.body.classList.contains('touring')){ last=now; requestAnimationFrame(tick); return; }   // the tour covers the model: stop drawing it
   const dt=Math.min(.1,(now-last)/1000); last=now; frame++; state.time+=dt;
   // keep the frame rate smooth: lower the resolution on slow devices, raise it again when there is headroom
-  perf.acc+=dt; perf.n++; if(perf.n>=45){ const ms=perf.acc/perf.n*1000; perf.acc=0; perf.n=0;
-    if(ms>21 && dpr>.75){ dpr=Math.max(.75,dpr-.25); resize(); } else if(ms<12 && dpr<DPR_MAX){ dpr=Math.min(DPR_MAX,dpr+.25); resize(); } }
+  // resolution changes only after sustained slowness (about 3 s), never in the middle of a zoom, and never below 1x
+  perf.acc+=dt; perf.n++; if(perf.n>=60){ const ms=perf.acc/perf.n*1000; perf.acc=0; perf.n=0;
+    perf.slow = ms>26 ? perf.slow+1 : ms<15 ? perf.slow-1 : perf.slow; perf.slow=Math.max(-3,Math.min(3,perf.slow));
+    if(!busy && perf.slow>=3 && dpr>1){ dpr=Math.max(1,dpr-.25); perf.slow=0; resize(); }
+    else if(!busy && perf.slow<=-3 && dpr<DPR_MAX){ dpr=Math.min(DPR_MAX,dpr+.25); perf.slow=0; resize(); } }
+  { const md=camera.position.distanceTo(camPrev)+controls.target.distanceTo(tgtPrev), sc=Math.max(1e-3,camera.position.distanceTo(controls.target));
+    if(md/sc>1e-4 || dragging || state.zoomGoal!==null) lastMove=now; camPrev.copy(camera.position); tgtPrev.copy(controls.target);
+    busy = now-lastMove<350; }
+  const bg = busy ? 6 : 2;   // how often background updates run: every 2nd frame normally, every 6th while moving
   if(state.playing) state.ut += state.rate*state.dir*dt;
   state.ut=Math.max(-1095000, Math.min(1095000, state.ut));
   const ease=k=>Math.min(1,dt*k);
@@ -1220,13 +1246,13 @@ function tick(now){
     b.mesh.material.uniforms.uL.value.copy(W.applyQuaternion(tmpQ.copy(b.mesh.quaternion).invert()));
     b.mesh.material.uniforms.uT.value=state.time;
     b.trailLine.visible=state.showTrails;
-    if(state.showTrails && geoChanged && (frame%2===0 || state.rate<0.3)){ updateTrail(b.trail, b.key, b.span, state.ut);
+    if(state.showTrails && geoChanged && (frame%bg===0 || (!busy && state.rate<0.3))){ updateTrail(b.trail, b.key, b.span, state.ut);
       drawTrail(b.trailLine, b.trail.pts, b.col, (q,o)=>dispBody(b,q.p,q.s,o)); }
   }
   sunGlow.position.copy(BMAP.Sun.mesh.position);
   const eD=dispEarth(sunNow,[0,0,0]);
   earthTrail.line.visible = state.showTrails && state.c>0.02;
-  if(earthTrail.line.visible && frame%2===0){ updateTrail(earthTrail.trail,'EarthT',365.25,state.ut);
+  if(earthTrail.line.visible && frame%bg===0){ updateTrail(earthTrail.trail,'EarthT',365.25,state.ut);
     drawTrail(earthTrail.line, earthTrail.trail.pts, earthTrail.col.map(x=>x*state.c), (q,o)=>dispEarth(q.s,o)); }
   for(const o of OUTER){ const P=pos[o.key]; dispBody({key:o.key,R:o.R}, P.p, sunNow, tmp); o.mesh.position.fromArray(tmp); }
   // Earth and the spheres centred on it
@@ -1237,9 +1263,9 @@ function tick(now){
   starShell.position.fromArray(eD); starShell.material.uniforms.uA.value=starShell.userData.base*(1-state.c)*(starShell.userData.iv??1);
   { const fa=(1-state.u)*(state.showShells?1:0); const on=fa>.01;
     flexShells.forEach(m=>{ m.visible=on; m.userData.cap.visible=on; m.material.uniforms.uA.value=.7*fa; m.material.uniforms.uHi.value = m.userData.key===state.sel?1:0; });
-    if(on && (frame%3===0 || state.rate<.05)) updateFlex(); }
+    if(on && (frame%(busy?6:3)===0 || (!busy && state.rate<.05))) updateFlex(); }
   if(moonGroups[0].visible) updateMoons(t);
-  if(smallBodies.visible && (frame%2===0)){ updateSmallBodies(t); if(frame%6===0 && geoChanged) updateCometOrbits(); }
+  if(smallBodies.visible && (frame%bg===0)){ updateSmallBodies(t); if(!busy && frame%6===0 && geoChanged) updateCometOrbits(); }
   W.set(sunNow[0],sunNow[1],sunNow[2]).applyMatrix3(nm3.setFromMatrix4(prec.matrixWorld)).normalize();
   earthMat.uniforms.uLv.value.copy(W).transformDirection(camera.matrixWorldInverse); earthMat.uniforms.uT.value=state.time;
   earthMat.uniforms.uL.value.copy(W.applyQuaternion(eInv.copy(earth.quaternion).invert()));
@@ -1260,7 +1286,7 @@ function tick(now){
     for(let i=0;i<NP;i++){ const s=i/(NP-1); ch.setXYZ(i,eD[0]+(end[0]-eD[0])*s,eD[1]+(end[1]-eD[1])*s,eD[2]+(end[2]-eD[2])*s); } ch.needsUpdate=true; chordLine.computeLineDistances();
     if(state.mech==='medium'){ const sp=[-.35,0,.35]; dispLines.forEach((l,k)=>setPath(l,[0,0,0],P,eD,end,sp[k]*Math.min(1,pos[state.sel].d))); }
   }
-  if(fabric.visible && geoChanged && frame%2===0) drawFabric();
+  if(fabric.visible && geoChanged && frame%bg===0) drawFabric();
   fabric.material.opacity=.2*(1-.6*state.c);
 
   // stars: yearly aberration and parallax (magnified)
@@ -1285,7 +1311,9 @@ function tick(now){
   bloom.strength += ((state.warpT>now?1.2:.55) - bloom.strength)*ease(3);
   { const dt2=camera.position.distanceTo(controls.target), nn=Math.min(6,Math.max(.004,dt2*.0006)); if(Math.abs(nn-camera.near)>camera.near*.15){ camera.near=nn; camera.updateProjectionMatrix(); } }
   if(state.intro!==null) applyIntroVis(t);
-  if(!(state.intro!==null && zoomOp>=.999)) composer.render();   // the true-scale canvas fully covers the model: skip drawing it
+  // when nothing is moving and time is paused, redraw at half rate (the slow shader shimmer still runs)
+  const idle=!busy && !state.playing && state.u===state.uTarget && state.c===state.cTarget && state.intro===null && !(state.warpT>now);
+  if(!(state.intro!==null && zoomOp>=.999) && (!idle || frame%2===0)) composer.render();   // the true-scale canvas fully covers the model: skip drawing it
 
   // labels
   for(const b of BODIES){ b.mesh.getWorldPosition(W); place(b.lbl,W,camera.position.length()<140 || state.focus===b.key); }
@@ -1316,6 +1344,10 @@ function tick(now){
     const tip=(a,d,L)=>W.copy(d).multiplyScalar(off+L).add(earth.position);
     for(const h of holdLbls){ if(h.k==='s') tip(arSun,sw,Ls); else if(h.k==='m') tip(arMoon,mw,Lm); else if(h.k==='f') tip(arField,fd,Lf); else W.set(0,RE*3.2*es3,0).add(earth.position); place(h.el,W,state.intro===null); } }
   else for(const h of holdLbls) place(h.el,W,false);
+  if(armGroup.visible){ const a=new THREE.Vector3(), b2=new THREE.Vector3();
+    for(const r of ARMS){ bodyWorld(r.from,a); bodyWorld(r.k,b2); const pa=r.ln.geometry.attributes.position; pa.setXYZ(0,a.x,a.y,a.z); pa.setXYZ(1,b2.x,b2.y,b2.z); pa.needsUpdate=true;
+      W.copy(a).lerp(b2,.55); place(r.el,W,state.intro===null && !state.skyView && !state.far && (r.k===state.sel || r.k==='Sun')); } }
+  else if(ARMS[0].el._v) for(const r of ARMS) place(r.el,W,false);
   for(const s of elemLbls){ W.copy(dir).multiplyScalar((RE+s.t*(elemOuter()-RE))*es).add(EW); place(s.el,W,nameOK && state.showElem); }
   for(const z of zodLabels){ W.copy(z.pos).applyMatrix4(prec.matrixWorld); place(z.el,W,(state.intro!==null || state.showZod) && !state.far); }
   for(const s of signLabels){ W.copy(s.pos).applyMatrix4(sky.matrixWorld); place(s.el,W,state.showSigns && !state.far); }
@@ -1323,9 +1355,9 @@ function tick(now){
 
   const d=t.date; $('clock-d').textContent=`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
   $('clock-s').textContent=`${$('t-rate').selectedOptions[0].text}${state.dir<0?', reversed':''}${state.playing?'':', paused'}`;
-  if(frame%6===0) uiFrame();
-  if(now>readoutDue && state.intro===null && (!$('right').classList.contains('min') || activePane==='light')){ readouts(t); readoutDue=now+250; }
-  if(state.showAsc && state.intro===null && frame%10===0) applyClassical(state.ut);
+  if(frame%(busy?12:6)===0) uiFrame();
+  if(now>readoutDue && !busy && state.intro===null && (!$('right').classList.contains('min') || activePane==='light')){ readouts(t); readoutDue=now+250; }
+  if(state.showAsc && !busy && state.intro===null && frame%10===0) applyClassical(state.ut);
   requestAnimationFrame(tick);
 }
 

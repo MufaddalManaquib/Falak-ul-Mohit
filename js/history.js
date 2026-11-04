@@ -111,6 +111,45 @@ B.push({ era: 'Classical teaching · Ptolemy to the Ikhwān', kicker: 'Istiqāma
       lab.textContent = m[0]; lab2.textContent = m[1]; lab.setAttribute('class', 'hlab big ' + (m[0] === 'rujūʿ' ? 'hwarn' : '')); };
   } });
 
+// 4c · the answer in this model: two steady forward turnings, and a backward stretch that belongs only to the view
+B.push({ era: 'The answer in this model', kicker: 'Why Mars turns back', title: 'The lantern on the arm',
+  body: 'Positions in the model follow Tycho’s arrangement, which gives exactly the same sky as the Sun-centred picture. The Sun circles the still Earth once a year. Mars rides on an arm from the Sun that turns once in 687 days. Both turnings always go forward, at nearly steady rates; neither ever reverses. Every 26 months the Sun’s faster circle overtakes Mars’s arm on the same side, and for about ten weeks the sum of the two forward motions points backward from Earth: that is rujūʿ. The path traced round Earth does curl at each passing, but nothing in Mars’s own motion turns back. Its arm is also tilted 1.85° to the Sun’s circle, so the path is not flat: it lies on a thin ring-shaped surface, which is why it draws a loop one time and a zigzag the next. In the model, open Mars’s card and choose “See the whole path”.',
+  vis(v) { const s = svg('The Sun circles a still Earth; Mars rides on a steadily turning arm from the Sun; the direction seen from Earth turns back at each passing'); v.appendChild(s); defs(s); starfield(s, 50, 41);
+    const ex = 235, ey = 245, RS = 66, RA = 66 * 1.524, RZ = 214, wS = .75, wA = wS / 1.881;
+    ring(s, ex, ey, RZ, 'hring hi');
+    for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; el('line', { x1: ex + Math.cos(a) * (RZ - 6), y1: ey - Math.sin(a) * (RZ - 6), x2: ex + Math.cos(a) * (RZ + 6), y2: ey - Math.sin(a) * (RZ + 6), class: 'hring hi' }, s); }
+    txt(s, ex, ey - RZ - 12, 'the signs, seen from Earth', 'tick', 'middle');
+    ring(s, ex, ey, RS, 'hpath'); earth(s, ex, ey, 10);
+    const armRing = ring(s, 0, 0, RA), tr = curve(s, 'htrail'), back = el('path', { class: 'hback', d: '' }, s);
+    const sight = el('line', { class: 'hsight2' }, s), zArc = el('path', { class: 'hzarc', d: '' }, s), zBack = el('path', { class: 'hback', d: '' }, s), zMark = dot(s, 4, '#ffe08a');
+    const sg = el('g', {}, s); sun(sg, 0, 0, 12); const arm = el('line', { class: 'harmM' }, s), md = dot(s, 5.5, '#ff9d6e', 'hglow');
+    // three dials: the Sun's circle and the arm always turn forward; the direction seen from Earth sometimes turns back
+    const dials = [['the Sun’s circle', '#ffd27a'], ['Mars’s arm', '#ff9d6e'], ['seen from Earth', '#eceef6']].map(([l, c], k) => { const y = 70 + k * 120, g = el('g', {}, s);
+      el('circle', { cx: 540, cy: y, r: 28, class: 'hring hi' }, g); const h = el('line', { x1: 540, y1: y, x2: 568, y2: y, stroke: c, 'stroke-width': 2, 'stroke-linecap': 'round' }, g);
+      txt(g, 540, y + 46, l, 'tick', 'middle'); const st = txt(g, 540, y + 60, 'always forward', 'tick hok', 'middle'); return { y, h, st, c }; });
+    const pos = t => { const a = t * wS, b = t * wA, sx = Math.cos(a) * RS, sy = Math.sin(a) * RS; return { sx, sy, mx: sx + Math.cos(b) * RA, my: sy + Math.sin(b) * RA, a, b }; };
+    const P = t => { const q = pos(t); return [ex + q.mx, ey - q.my]; }, dirA = t => { const q = pos(t); return Math.atan2(q.my, q.mx); };
+    const setHand = (d, ang) => { d.h.setAttribute('x2', (540 + Math.cos(ang) * 26).toFixed(1)); d.h.setAttribute('y2', (d.y - Math.sin(ang) * 26).toFixed(1)); };
+    txt(s, 20, 477, 'Not to scale in time: a year here passes in about eight seconds.', 'tick');
+    this.anim = t => { const q = pos(t), sx = ex + q.sx, sy = ey - q.sy, mx = ex + q.mx, my = ey - q.my;
+      sg.setAttribute('transform', `translate(${sx.toFixed(1)} ${sy.toFixed(1)})`); at(armRing, sx, sy); at(md, mx, my);
+      arm.setAttribute('x1', sx); arm.setAttribute('y1', sy); arm.setAttribute('x2', mx); arm.setAttribute('y2', my);
+      tr.draw(P, t - 18, t, 300);
+      // backward stretches of the path, and of the direction on the ring of signs
+      const pb = [], zb = [], za = []; let prev = dirA(t - 18), was = false;
+      for (let k = 1; k <= 300; k++) { const tt = t - 18 + 18 * k / 300, an = dirA(tt); let d = an - prev; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; const bk = d < 0;
+        if (k > 240) za.push(`${za.length ? 'L' : 'M'}${(ex + Math.cos(an) * RZ).toFixed(1)} ${(ey - Math.sin(an) * RZ).toFixed(1)}`);
+        if (bk) { const [x, y] = P(tt); pb.push(`${was ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`); zb.push(`${was ? 'L' : 'M'}${(ex + Math.cos(an) * RZ).toFixed(1)} ${(ey - Math.sin(an) * RZ).toFixed(1)}`); }
+        was = bk; prev = an; }
+      back.setAttribute('d', pb.join(' ')); zBack.setAttribute('d', zb.join(' ')); zArc.setAttribute('d', za.join(' '));
+      const an = dirA(t); at(zMark, ex + Math.cos(an) * RZ, ey - Math.sin(an) * RZ);
+      sight.setAttribute('x1', ex); sight.setAttribute('y1', ey); sight.setAttribute('x2', ex + Math.cos(an) * RZ); sight.setAttribute('y2', ey - Math.sin(an) * RZ);
+      let d = dirA(t + .02) - an; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+      setHand(dials[0], q.a); setHand(dials[1], q.b); setHand(dials[2], an);
+      const bk = d < 0, d2 = dials[2]; d2.h.setAttribute('stroke', bk ? '#ff4d6d' : d2.c); const tx = bk ? 'turning back · rujūʿ' : 'forward · istiqāma';
+      if (d2.st.textContent !== tx) { d2.st.textContent = tx; d2.st.setAttribute('class', 'tick ' + (bk ? 'hwarn' : 'hok')); } };
+  } });
+
 // 5 · Copernicus
 B.push({ era: '1543 · Frombork', kicker: 'Copernicus, De revolutionibus', title: 'Turned inside out',
   body: 'Copernicus put the Sun at the centre and set the planets outward from it in order of their periods, fixing their relative distances for the first time. Earth spins once a day, so the outermost sphere of stars is left motionless. With nothing up there to turn, al-Muhit has no place in his scheme.',
@@ -173,6 +212,26 @@ B.push({ era: '1728 – 1925', kicker: 'Bradley · Bessel · Shapley · Hubble',
     const ln = el('line', { class: 'hsight' }, s), img = dot(s, 5, '#ffd27a', 'hglow'); txt(s, 360, 330, 'Bessel, 1838: 0.3″', 'hlab');
     this.anim = t => { const a = t * .8, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; at(e, x, y);
       const dx = st.x - x, dy = st.y - y, k = (120 - y) / dy, ix = x + dx * k; ln.setAttribute('x1', x); ln.setAttribute('y1', y); ln.setAttribute('x2', ix); ln.setAttribute('y2', 120); at(img, ix, 120); };
+  } });
+
+// 9b · the stars' yearly ellipses, read from a still Earth
+const PX = [['Proxima Cen', .768, -44.8], ['61 Cygni', .286, 51.7], ['Vega', .130, 61.7], ['Deneb', .0023, 59.9]];
+B.push({ era: 'The answer in this model', kicker: 'Parallax and aberration, read from a still Earth', title: 'Why the stars trace small loops',
+  body: 'Each year every star traces a tiny ellipse. In the Sun-centred picture this is Earth swinging round the Sun. With Earth still, the same numbers say something else: the whole eighth sphere is carried, without turning, round a copy of the Sun’s yearly circle, in step with the Sun. No star wanders. The near ones simply show the carry more: Proxima Centauri’s ellipse is 0.77″ across its long half, 61 Cygni’s 0.29″, Deneb’s two thousandths. A second ellipse, 20.5″ for every star alike, is aberration: light arriving through the yearly swing of the frame. It runs a quarter-year behind the first. Both are locked to the Sun’s year, and the model draws both at their true sizes.',
+  vis(v) { const s = svg('Every star traces a yearly ellipse in step with the Sun: parallax sized by distance, aberration the same for all'); v.appendChild(s); defs(s); starfield(s, 40, 77);
+    const ex = 300, ey = 418, RS = 38, kP = 40, kA = 22, rows = [[118, 'Parallax · the eighth sphere carried round a copy of the Sun’s circle · size ∝ 1/distance'], [270, 'Aberration · 20.5″ for every star · a quarter-year behind']];
+    rows.forEach(([y, l]) => txt(s, 20, y - 62, l, 'hlab'));
+    ring(s, ex, ey, RS, 'hpath'); earth(s, ex, ey, 9); const sg = el('g', {}, s); sun(sg, 0, 0, 9); const vel = el('line', { class: 'hsight' }, s);
+    txt(s, ex + 52, ey + 4, 'the Sun’s yearly circle', 'tick');
+    const items = [];
+    PX.forEach(([n, p, b], k) => { const x = 85 + k * 145, sb = Math.abs(Math.sin(b * DEG));
+      for (const [ri, [y]] of rows.entries()) { const rx = ri ? kA : Math.max(.6, p * kP), ry = rx * sb;
+        el('ellipse', { cx: x, cy: y, rx, ry, class: 'hpath' }, s); const d = dot(s, ri ? 3 : 3.6, '#fff', 'hglow'); items.push({ x, y, rx, ry, d, lag: ri ? Math.PI / 2 : 0 }); }
+      txt(s, x, rows[0][0] + 42, n, 'tick', 'middle'); txt(s, x, rows[0][0] + 56, p >= .01 ? p.toFixed(2) + '″' : p.toFixed(4) + '″', 'tick', 'middle'); });
+    txt(s, 20, 458, 'Parallax drawn 45 times larger than aberration. Phases schematic: each shift points toward', 'tick'); txt(s, 20, 474, 'the Sun’s place (parallax) or opposite to the Sun’s yearly motion (aberration).', 'tick');
+    this.anim = t => { const a = t * .8, sx = ex + Math.cos(a) * RS, sy = ey - Math.sin(a) * RS; sg.setAttribute('transform', `translate(${sx.toFixed(1)} ${sy.toFixed(1)})`);
+      vel.setAttribute('x1', sx); vel.setAttribute('y1', sy); vel.setAttribute('x2', sx - Math.sin(a) * 26); vel.setAttribute('y2', sy - Math.cos(a) * 26);
+      items.forEach(it => { const ph = a - it.lag; at(it.d, it.x + Math.cos(ph) * it.rx, it.y - Math.sin(ph) * it.ry); }); };
   } });
 
 // 10 · Einstein: two frames, one sky
@@ -267,7 +326,7 @@ const EVIDENCE = {
   'A Sun at the centre, too early': [
     'Critics expected the stars to shift through the year if Earth moved, and saw nothing. No one felt Earth moving.',
     'The objection was mistaken: the largest stellar parallax is 0.77″, far below the eye’s limit. The model itself had circles and no quantitative theory.',
-    'Parallax and aberration are carried as a yearly motion of the eighth sphere at true size. What Earth’s motion explains, the frame forces of the Earth-fixed description explain here.'],
+    'The eighth sphere is carried, without turning, round a copy of the Sun’s yearly circle, so each star traces a small ellipse in step with the Sun, larger for nearer stars, at true size. No star wanders; Earth stays still. Aberration (20.5″, the same for all) is drawn too.'],
   'Circles on circles': [
     'Venus shows a full set of phases (Galileo, 1610), so it passes behind the Sun. The Moon’s apparent size changes by only about 13%, not the near doubling Ptolemy’s lunar model implies. By the 16th century the tables were off by degrees for Mars.',
     'Spheres ordered rigidly by distance keep Venus always between Earth and the Sun. The equant breaks uniform circular motion. Each planet’s cycle is tied to the Sun by coincidence, not cause.',
@@ -343,12 +402,14 @@ function fixScene(type) {
       lab.textContent = Math.abs(dth) < .0006 ? 'wuqūf · station' : dth < 0 ? 'rujūʿ · turning back' : d1 < 0 ? 'hubūṭ · descending' : 'ṣuʿūd · rising';
       marS.setAttribute('class', d1 < 0 ? 'hflex desc' : 'hflex asc'); };
   } else if (type === 'parallax') {
-    s.setAttribute('aria-label', 'A nearby star wobbling yearly on the eighth sphere, locked to the Sun');
-    ring(s, C, C, 120, 'hring hi'); ring(s, C, C, 42); earth(s, C, C, 8); const sd = dot(s, 6, '#ffd27a');
-    el('circle', { cx: C + 40, cy: C - 112, r: 1.6, class: 'hstar' }, s); el('circle', { cx: C - 52, cy: C - 108, r: 1.4, class: 'hstar' }, s);
-    el('ellipse', { cx: C - 6, cy: C - 118, rx: 12, ry: 5, class: 'hpath' }, s); const st = dot(s, 3.5, '#fff', 'hglow');
-    cap.textContent = 'A yearly wobble of the eighth sphere, locked to the Sun (×20,000)';
-    anim = t => { const a = t * .7; at(sd, C + Math.cos(a) * 42, C - Math.sin(a) * 42); at(st, C - 6 + Math.cos(a) * 12, C - 118 - Math.sin(a) * 5); };
+    s.setAttribute('aria-label', 'The eighth sphere carried round a copy of the Sun’s yearly circle: nearer stars show bigger ellipses, all in step with the Sun');
+    const ex = C, ey = 214, RS = 34; ring(s, ex, ey, RS, 'hpath'); earth(s, ex, ey, 8); const sd = dot(s, 6, '#ffd27a');
+    el('path', { d: 'M20 108 Q150 52 280 108', class: 'hring hi' }, s); txt(s, 150, 46, 'the eighth sphere', 'tick', 'middle');
+    const st = [[70, 96, 24, 'near'], [150, 74, 11, 'farther'], [232, 96, 2.5, 'far']].map(([x, y, r, l]) => { el('ellipse', { cx: x, cy: y, rx: r, ry: r * .45, class: 'hpath' }, s); txt(s, x, y + 26, l, 'tick', 'middle');
+      return { x, y, r, d: dot(s, 3.4, '#fff', 'hglow'), ln: el('line', { class: 'hsight2' }, s) }; });
+    cap.textContent = 'Each star copies the Sun’s yearly circle, in step with it; nearer stars show a bigger copy (greatly enlarged)';
+    anim = t => { const a = t * .7, c = Math.cos(a), sn = Math.sin(a); at(sd, ex + c * RS, ey - sn * RS);
+      st.forEach(q => { const x = q.x + c * q.r, y = q.y - sn * q.r * .45; at(q.d, x, y); q.ln.setAttribute('x1', ex + c * RS); q.ln.setAttribute('y1', ey - sn * RS); q.ln.setAttribute('x2', x); q.ln.setAttribute('y2', y); }); };
   } else if (type === 'venus') {
     s.setAttribute('aria-label', 'Venus’s flexing sphere reaching past the Sun’s, with Venus showing a full phase');
     const vS = flexLine('hflex'), sS = flexLine('hflex sun'); earth(s, C, C, 8); const sd = dot(s, 7, '#ffd27a'), vd = dot(s, 4.5, '#fff3d6');

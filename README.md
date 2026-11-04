@@ -24,6 +24,9 @@ An interactive, Earth-centred model of the universe. Nine nested spheres turn ar
 - **Layers** for the four elements (earth, water, air and fire merging without boundaries below the Moon) and for **what holds Earth still** (the Sun's and Moon's pull balanced by the field of the sky's yearly swing; Earth's magnetic field, which shields but does not hold).
 - **Ascent, descent and houses** layer: each sphere glows gold while its planet rises (ṣuʿūd, distance growing) and blue while it descends (hubūṭ); labels give istiqāma, wuqūf or rujūʿ; the sign band shows houses and exaltations (Ptolemy, Tetrabiblos I.17, I.19); the body card has a strip of the stations and the backward stretch, which falls at the bottom of each descent.
 - An optional **Haqiqat layer** (the ten intellects and hudud after al-Kirmani), off by default and switched on in Settings.
+- **The Sun's arms** layer and **the whole path** view (`js/torus.js`): each planet rides on an arm from the Sun that turns steadily one way, and the Sun carries every arm round the still Earth once a year (Tycho's arrangement, the same sky as the Sun-centred picture). From any planet's card, a 3D view draws the real path over several years on the ring-shaped surface it lies on, with dials showing that the Sun's circle and the arm always turn forward while only the direction seen from Earth turns back; each backward stretch is labelled loop or zigzag from the planet's latitude.
+- **History additions:** "The lantern on the arm" (why Mars turns back) and "Why the stars trace small loops" (the eighth sphere carried, without turning, round a copy of the Sun's yearly circle; parallax sized by distance, aberration the same for every star).
+- **Sharp rendering:** multisampled post-processing (smooth lines and sphere edges), full device resolution kept while zooming, and background updates paused while the camera moves.
 
 ## Running it locally
 
