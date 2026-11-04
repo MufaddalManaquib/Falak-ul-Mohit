@@ -702,3 +702,15 @@ body.touring #ui{visibility:hidden}
 .hsvg .hlab.big{font-size:17px}
 @media (max-width:899px),(max-aspect-ratio:105/100){ .hpair{gap:8px}.hpair h5{font-size:9px} #history .tb.hasev .hpast .hsvg,.hfixsvg{max-height:20vh} }
 .hfixcap{margin:4px 0 4px;font:300 12px/1.4 var(--f-body);color:#d9cfb8;text-align:center}
+/* classical states */
+.lbl .ctag{display:block;margin-top:2px;font:400 10px var(--f-body);letter-spacing:.02em;color:#d9c79f}
+.lbl .ctag.r{color:#ff9d84}.lbl .ctag.w{color:#ffe08a}
+.zlbl small.zh{display:block;color:rgba(255,217,160,.65);font-size:9.5px}
+.zlbl small.zl{display:block;color:#ffd9a0;font-size:10px}
+.zlbl.lit{color:#ffe7c2;text-shadow:0 0 10px rgba(255,200,120,.6)}
+#cls-strip svg{display:block;width:100%;height:auto;font:400 8.5px var(--f-body)}
+.clsvg text{fill:#8e93b4}.clsvg .cf{fill:none;stroke:#eef0fb;stroke-width:1.6}.clsvg .cr{fill:none;stroke:#ff4d6d;stroke-width:2.4}
+.clsvg .cd{fill:none;stroke:rgba(158,196,255,.55);stroke-width:1;stroke-dasharray:3 3}.clsvg .cw{fill:#ffe08a}.clsvg .cn{stroke:rgba(255,255,255,.35)}
+.hsvg .hback{fill:none;stroke:#ff4d6d;stroke-width:3;stroke-linecap:round;filter:none}
+.hsvg .hasc{fill:none;stroke:rgba(255,217,160,.55);stroke-width:1.4}
+.hsvg .hflex.desc{stroke:rgba(127,178,255,.85)}.hsvg .hflex.asc{stroke:rgba(255,196,107,.85)}

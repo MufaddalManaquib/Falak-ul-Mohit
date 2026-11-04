@@ -91,6 +91,26 @@ B.push({ era: '9th–14th centuries · the Islamic world', kicker: 'al-Battānī
       rot(ticks, -((t * 12) % 10), ox, oy); };
   } });
 
+// 4b · rising, descending, turning back
+B.push({ era: 'Classical teaching · Ptolemy to the Ikhwān', kicker: 'Istiqāma · wuqūf · rujūʿ', title: 'Rising, descending, turning back',
+  body: 'Classical astronomy named three states of a planet’s motion: istiqāma, moving directly eastward; wuqūf, standing at a station; and rujūʿ, turning back. In Ptolemy’s models a planet turns back when it is at the lowest point of its epicycle, nearest Earth (Almagest, Book XII). Each planet was also given houses among the signs, and a sign of exaltation and of fall (Tetrabiblos I.17 and I.19). The Ikhwān al-Ṣafāʾ tabulate the planets’ periods and how long each stays retrograde, and list the exaltations and falls, in their epistle on astronomy.',
+  vis(v) { const s = svg('A planet on its epicycle: direct motion, stations and the backward stretch at the lowest point'); v.appendChild(s); defs(s);
+    const ex = 250, ey = 250, R = 130, r = 58; ring(s, ex, ey, R); earth(s, ex, ey, 11);
+    const epi = ring(s, 0, 0, r, 'hring hi'), tr = curve(s, 'htrail'), back = el('path', { class: 'hback', d: '' }, s), p = dot(s, 6, '#ff9d6e', 'hglow');
+    const st1 = dot(s, 4, '#ffe08a'), st2 = dot(s, 4, '#ffe08a'), lab = txt(s, 470, 60, '', 'hlab big', 'start'), lab2 = txt(s, 470, 84, '', 'tick');
+    const w1 = .3, w2 = 1.85, pt = t => { const a = t * w1, b = t * w2; return [ex + Math.cos(a) * R + Math.cos(b) * r, ey + Math.sin(a) * R + Math.sin(b) * r]; };
+    const ang = t => { const [x, y] = pt(t); return Math.atan2(y - ey, x - ex); };
+    txt(s, ex, ey + R + r + 30, 'the backward stretch comes at the bottom of the epicycle, nearest Earth', 'tick', 'middle');
+    this.anim = t => { const a = t * w1, c = [ex + Math.cos(a) * R, ey + Math.sin(a) * R], [px, py] = pt(t); at(epi, c[0], c[1]); at(p, px, py); tr.draw(pt, t - 14, t, 260);
+      // find the backward stretch of the last loop: where the angle seen from Earth decreases
+      const pts = [], stt = []; let prev = ang(t - 14), was = null;
+      for (let k = 1; k <= 280; k++) { const tt = t - 14 + 14 * k / 280, an = ang(tt); let d = an - prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; const bk = d < 0; if (was !== null && bk !== was) stt.push(pt(tt)); if (bk) { const q = pt(tt); pts.push(`${was ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`); } was = bk; prev = an; }
+      back.setAttribute('d', pts.join(' ')); if (stt[0]) at(st1, ...stt[stt.length - 2] || stt[0]); if (stt[1]) at(st2, ...stt[stt.length - 1]);
+      let d = ang(t + .02) - ang(t); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; const rate = d / .02;
+      const m = Math.abs(rate) < .04 ? ['wuqūf', 'standing at a station'] : rate < 0 ? ['rujūʿ', 'turning back'] : ['istiqāma', 'moving directly'];
+      lab.textContent = m[0]; lab2.textContent = m[1]; lab.setAttribute('class', 'hlab big ' + (m[0] === 'rujūʿ' ? 'hwarn' : '')); };
+  } });
+
 // 5 · Copernicus
 B.push({ era: '1543 · Frombork', kicker: 'Copernicus, De revolutionibus', title: 'Turned inside out',
   body: 'Copernicus put the Sun at the centre and set the planets outward from it in order of their periods, fixing their relative distances for the first time. Earth spins once a day, so the outermost sphere of stars is left motionless. With nothing up there to turn, al-Muhit has no place in his scheme.',
@@ -236,6 +256,10 @@ B.push({ layout: 'title', label: 'Enter', html: `<p class="t-eyebrow">Now</p><h2
 
 // ---------- for every model: what the sky showed, the fault, and how the flexing spheres handle it ----------
 const EVIDENCE = {
+  'Rising, descending, turning back': [
+    'Every 26 months Mars slows, stands still, turns back for about ten weeks, stands again and moves on. It happens only when Mars is opposite the Sun, nearest Earth and at its brightest.',
+    'None in the teaching itself: a planet does turn back at its nearest. What failed was the epicycle taken as a real wheel, together with the rigid order of shells (see Venus’s phases).',
+    'The same three states appear in the flexing spheres. Mars descends toward Earth (hubūṭ), stands (wuqūf), turns back at its nearest (rujūʿ), and rises again (ṣuʿūd). The model names each state, and marks every planet’s houses, exaltation and fall.'],
   'Spheres within spheres': [
     'Planets change in brightness: Mars at opposition is many times brighter than at conjunction. Some solar eclipses are total, others annular, so the Moon’s distance changes.',
     'Every body is fixed to a sphere centred on Earth, so its distance can never change. The nested spheres also cannot reproduce the size and shape of Mars’s backward loops.',
@@ -286,7 +310,7 @@ B.forEach(b => { const ev = EVIDENCE[b.title]; if (!ev) return; const vis0 = b.v
   b.vis = function (v) { vis0.call(this, v); v.insertAdjacentHTML('beforeend', evCard(ev)); }; });
 
 // ---------- beside each past model: an animation of how the nested, flexing spheres handle the same evidence ----------
-const FIXTYPE = { 'Spheres within spheres': 'distance', 'A Sun at the centre, too early': 'parallax', 'Circles on circles': 'venus', 'The ninth sphere': 'solar',
+const FIXTYPE = { 'Rising, descending, turning back': 'retro', 'Spheres within spheres': 'distance', 'A Sun at the centre, too early': 'parallax', 'Circles on circles': 'venus', 'The ninth sphere': 'solar',
   'Turned inside out': 'ellipse', 'A still Earth, done better': 'frame', 'Ellipses, and the evidence': 'rosette', 'One law for heaven and Earth': 'bending',
   'The stars move, and so do we': 'depth', 'No privileged frame': 'none', 'Nothing is at rest': 'agree' };
 function fixScene(type) {
@@ -304,6 +328,20 @@ function fixScene(type) {
       const rM = R(dM), rS = R(1), fM = th => 108 + (rM - 108) * bump(th, thM, .45), fS = th => Math.min(rS, fM(th) - 9);
       marS.setAttribute('d', curvePath(fM)); sunS.setAttribute('d', curvePath(fS));
       at(sd, C + Math.cos(thS) * rS, C - Math.sin(thS) * rS); at(md, C + Math.cos(thM) * rM, C - Math.sin(thM) * rM); md.setAttribute('r', 2.2 + 3.2 / dM); };
+  } else if (type === 'retro') {
+    s.setAttribute('aria-label', 'Mars descending to its nearest, turning back, and rising again on its flexing sphere');
+    const marS = flexLine('hflex'); earth(s, C, C, 8); const tr = curve(s, 'hasc'), trB = el('path', { class: 'hback', d: '' }, s), md = dot(s, 4.5, '#ff9d6e', 'hglow');
+    const lab = txt(s, 150, 28, '', 'hlab big', 'middle');
+    const R = d => 34 + 44 * Math.log(d / .35), mars = tt => { const ae = tt * .5, am = ae / 1.881, mx = 1.524 * Math.cos(am) - Math.cos(ae), my = 1.524 * Math.sin(am) - Math.sin(ae); return { d: Math.hypot(mx, my), th: Math.atan2(my, mx) }; };
+    const xy = tt => { const m = mars(tt); return [C + Math.cos(m.th) * R(m.d), C - Math.sin(m.th) * R(m.d)]; };
+    cap.textContent = 'Sphere blue while Mars descends, gold while it rises; the backward stretch, in red, comes at its nearest';
+    anim = t => { const m = mars(t), rM = R(m.d); marS.setAttribute('d', curvePath(th => 104 + (rM - 104) * bump(th, m.th, .45))); const [x, y] = xy(t); at(md, x, y); md.setAttribute('r', 2.2 + 3 / m.d);
+      tr.draw(xy, t - 16, t, 240); const pts = []; let prev = mars(t - 16).th;
+      let wasB = false; for (let k = 1; k <= 240; k++) { const tt = t - 16 + 16 * k / 240, th = mars(tt).th; let d = th - prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; if (d < 0) { const q = xy(tt); pts.push(`${wasB ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`); } wasB = d < 0; prev = th; }
+      trB.setAttribute('d', pts.join(' '));
+      const d1 = mars(t + .03).d - m.d; let dth = mars(t + .03).th - m.th; if (dth > Math.PI) dth -= 2 * Math.PI; if (dth < -Math.PI) dth += 2 * Math.PI;
+      lab.textContent = Math.abs(dth) < .0006 ? 'wuqūf · station' : dth < 0 ? 'rujūʿ · turning back' : d1 < 0 ? 'hubūṭ · descending' : 'ṣuʿūd · rising';
+      marS.setAttribute('class', d1 < 0 ? 'hflex desc' : 'hflex asc'); };
   } else if (type === 'parallax') {
     s.setAttribute('aria-label', 'A nearby star wobbling yearly on the eighth sphere, locked to the Sun');
     ring(s, C, C, 120, 'hring hi'); ring(s, C, C, 42); earth(s, C, C, 8); const sd = dot(s, 6, '#ffd27a');

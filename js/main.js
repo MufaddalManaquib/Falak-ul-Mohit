@@ -856,6 +856,31 @@ const magGroup=new THREE.Group(); earth.add(magGroup); magGroup.visible=false;
 const holdLbls=[['s','Pull of the Sun · 5.93 mm/s²'],['m','Pull of the Moon · 0.03 mm/s² (arrow enlarged)'],['f','Field of the sky’s yearly swing · equal and opposite'],['g','Earth’s magnetic field · shields it, does not hold it']].map(([k,t])=>({k, el:mk('slbl hold',t)}));
 for(const z of zodLabels) z.el=mk('zlbl',z.html);
 for(const s of signLabels) s.el=mk('zlbl',s.html);
+// ---------- classical states of motion, houses, exaltation and fall ----------
+// istiqāma (direct, eastward), wuqūf (station), rujūʿ (retrograde); ṣuʿūd (rising: distance from Earth growing), hubūṭ (descending).
+// Houses and exaltations after Ptolemy, Tetrabiblos I.17 and I.19 (tropical signs, counted from the equinox of date, as on the sign band).
+const SIGN_EN=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const HOUSES={Sun:[[4,'']],Moon:[[3,'']],Mercury:[[2,'day'],[5,'night']],Venus:[[6,'day'],[1,'night']],Mars:[[0,'day'],[7,'night']],Jupiter:[[8,'day'],[11,'night']],Saturn:[[10,'day'],[9,'night']]};
+const EXALT={Sun:[0,19],Moon:[1,3],Mercury:[5,15],Venus:[11,27],Mars:[9,28],Jupiter:[3,15],Saturn:[6,21]};
+const MEANRATE={Sun:.9856,Moon:13.18,Mercury:.9856,Venus:.9856,Mars:.524,Jupiter:.0831,Saturn:.0335};
+const elonOf=(key,ut)=>A.Ecliptic(A.GeoVector(key,A.MakeTime(ut),true)).elon, distOf=(key,ut)=>{ const v=A.GeoVector(key,A.MakeTime(ut),true); return Math.hypot(v.x,v.y,v.z); };
+function classical(key,ut){
+  let dl=elonOf(key,ut+.5)-elonOf(key,ut-.5); if(dl>180) dl-=360; if(dl<-180) dl+=360;
+  const dd=(distOf(key,ut+.5)-distOf(key,ut-.5))*AU_KM, thr=.06*MEANRATE[key];
+  const motion = dl<-thr ? 'rujuʿ' : dl<thr ? 'wuquf' : 'istiqama';
+  const el=elonOf(key,ut), sg=Math.floor(((el%360)+360)%360/30), deg=((el%360)+360)%360-sg*30;
+  const house=(HOUSES[key]||[]).find(h=>h[0]===sg), ex=EXALT[key], exalt=ex&&ex[0]===sg, fall=ex&&(ex[0]+6)%12===sg;
+  return {dl, dd, motion, asc: dd>=0, sg, deg, house, exalt, fall};
+}
+const MOTION_TXT={istiqama:['istiqāma','direct, eastward'], wuquf:['wuqūf','standing at a station'], 'rujuʿ':['rujūʿ','turning back, westward']};
+let clsCache={}, clsKey='';
+function updateClassical(ut){ const k=Math.floor(ut*24); if(k===clsKey) return clsCache; clsKey=k; for(const b of BODIES) clsCache[b.key]=classical(b.key,ut); return clsCache; }
+function stationsAround(key,ut){ // the stations nearest to now, found where the longitude rate changes sign
+  if(key==='Sun'||key==='Moon') return [];
+  const rate=u=>{ let d=elonOf(key,u+.5)-elonOf(key,u-.5); if(d>180) d-=360; if(d<-180) d+=360; return d; }, out=[]; let prev=rate(ut-420);
+  for(let u=ut-418;u<=ut+420;u+=2){ const r=rate(u); if((r<0)!==(prev<0)){ let a=u-2,b=u; for(let i=0;i<14;i++){ const m=(a+b)/2; if((rate(m)<0)===(prev<0)) a=m; else b=m; } out.push({ut:(a+b)/2, turn: r<0?'back':'forward'}); } prev=r; }
+  return out; }
+
 const starLbls=SKY.names.map(([i,name])=>({pos:new THREE.Vector3(sDir[i*3],sDir[i*3+1],sDir[i*3+2]).multiplyScalar(sRad[i]), el:mk('stlbl',name)}));
 const V=new THREE.Vector3(), W=new THREE.Vector3(), EW=new THREE.Vector3();
 let W_=0,H_=0;
@@ -927,6 +952,40 @@ function drawScope(t, b, il){
 const fmtRA=h=>{ const H=Math.floor(h), m=(h-H)*60; return `${String(H).padStart(2,'0')}h ${m.toFixed(1).padStart(4,'0')}m`; };
 const fmtDec=d=>{ const s=d<0?'−':'+'; d=Math.abs(d); const D=Math.floor(d); return `${s}${D}° ${Math.round((d-D)*60)}′`; };
 const fmtAs=a=> a>=120? `${(a/60).toFixed(1)}′` : `${a.toFixed(1)}″`;
+const GOLD=new THREE.Color(0xffc46b), ICE=new THREE.Color(0x7fb2ff), BASEC=new THREE.Color(0xc6d4ff);
+function applyClassical(ut){ const C=updateClassical(ut);
+  BODIES.forEach((b,i)=>{ const c=C[b.key], col=c.asc?GOLD:ICE; planetShells[i].material.uniforms.uC.value.copy(col); flexShells[i].material.uniforms.uC.value.copy(col);
+    let tag=b.lbl.querySelector('.ctag'); if(!tag){ tag=document.createElement('span'); tag.className='ctag'; b.lbl.appendChild(tag); }
+    const m=MOTION_TXT[c.motion], h=c.house?' · own house':c.exalt?' · exalted':c.fall?' · in fall':'';
+    const txt=`${c.asc?'ṣuʿūd ↑':'hubūṭ ↓'}${b.key==='Sun'||b.key==='Moon'?'':' · '+m[0]}${h}`; if(tag.textContent!==txt){ tag.textContent=txt; tag.className='ctag '+(c.motion==='rujuʿ'?'r':c.motion==='wuquf'?'w':''); } });
+  signLabels.forEach((s,k)=>{ const own=BODIES.filter(b=>(HOUSES[b.key]||[]).some(h=>h[0]===k)).map(b=>b.en), ex=BODIES.filter(b=>EXALT[b.key][0]===k).map(b=>`${b.en} exalted ${EXALT[b.key][1]}°`);
+    const here=BODIES.filter(b=>C[b.key].sg===k && (C[b.key].house||C[b.key].exalt)).map(b=>b.en);
+    const html=s.html+`<small class="zh">house of ${own.join(' and ')}${ex.length?' · '+ex.join(', '):''}</small>`+(here.length?`<small class="zl">${here.join(', ')} at home here</small>`:'');
+    if(s.el.innerHTML!==html){ s.el.innerHTML=html; } s.el.classList.toggle('lit',here.length>0); }); }
+function classicalCard(t){ const b=BMAP[state.sel], c=classical(b.key,t.ut), m=MOTION_TXT[c.motion];
+  const rows=[['Ascent', `${c.asc?'ṣuʿūd, rising':'hubūṭ, descending'} · ${c.dd>=0?'+':'−'}${Math.abs(Math.round(c.dd)).toLocaleString()} km/day`]];
+  if(b.key!=='Sun'&&b.key!=='Moon') rows.push(['Motion', `${m[0]}, ${m[1]}`]);
+  rows.push(['In the sign of', `${SIGN_EN[c.sg]} ${c.deg.toFixed(1)}°${c.house?` · its own ${c.house[1]?c.house[1]+' ':''}house`:''}${c.exalt?' · its exaltation':''}${c.fall?' · its fall':''}`]);
+  const hs=(HOUSES[b.key]||[]).map(h=>`${SIGN_EN[h[0]]}${h[1]?' ('+h[1]+')':''}`).join(' and '), ex=EXALT[b.key];
+  rows.push(['Houses', hs], ['Exaltation · fall', `${SIGN_EN[ex[0]]} ${ex[1]}° · ${SIGN_EN[(ex[0]+6)%12]}`]);
+  $('cls-ro').innerHTML=rows.map(([k,v])=>`<div class="wide"><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  // the strip: longitude over a year and a half, with the stations (wuqūf) and the backward stretch (rujūʿ) marked
+  if(b.key==='Sun'||b.key==='Moon'){ $('cls-strip').innerHTML=''; $('cls-note').textContent=b.key==='Moon'?'The Moon never turns back; it rises and descends once a month.':'The Sun never turns back; it rises and descends once a year (farthest in early July).'; return; }
+  const key=b.key+Math.floor(t.ut); if(classicalCard.k===key) return; classicalCard.k=key;
+  const span=b.key==='Mercury'?120:b.key==='Venus'?320:b.key==='Mars'?400:260, N=140, pts=[];
+  for(let i=0;i<=N;i++){ const u=t.ut-span/2+span*i/N; pts.push({u, l:elonOf(b.key,u), d:distOf(b.key,u)}); }
+  for(let i=1;i<pts.length;i++){ while(pts[i].l-pts[i-1].l>180) pts[i].l-=360; while(pts[i].l-pts[i-1].l<-180) pts[i].l+=360; }
+  const lo=Math.min(...pts.map(p=>p.l)), hi=Math.max(...pts.map(p=>p.l)), dmin=Math.min(...pts.map(p=>p.d)), dmax=Math.max(...pts.map(p=>p.d));
+  const W2=300, H2=120, X=u=>10+(u-(t.ut-span/2))/span*(W2-20), Y=l=>H2-14-(l-lo)/Math.max(1e-6,hi-lo)*(H2-34), YD=d=>H2-14-(d-dmin)/Math.max(1e-9,dmax-dmin)*(H2-34);
+  let seg='', cur=null; const segs=[]; for(let i=1;i<pts.length;i++){ const back=pts[i].l<pts[i-1].l; if(back!==cur){ if(seg) segs.push([cur,seg]); seg=`M${X(pts[i-1].u).toFixed(1)} ${Y(pts[i-1].l).toFixed(1)}`; cur=back; } seg+=` L${X(pts[i].u).toFixed(1)} ${Y(pts[i].l).toFixed(1)}`; } segs.push([cur,seg]);
+  const dist='M'+pts.map(p=>`${X(p.u).toFixed(1)} ${YD(p.d).toFixed(1)}`).join(' L');
+  const st=stationsAround(b.key,t.ut).filter(s=>Math.abs(s.ut-t.ut)<span/2);
+  const fd=u=>{ const d=new Date((u+10957.5)*864e5); return d.toISOString().slice(0,10); };
+  $('cls-strip').innerHTML=`<svg viewBox="0 0 ${W2} ${H2}" class="clsvg" role="img" aria-label="Longitude and distance of ${b.en} over time, with stations and retrograde motion">
+    <path d="${dist}" class="cd"/>${segs.map(([bk,d])=>`<path d="${d}" class="${bk?'cr':'cf'}"/>`).join('')}
+    ${st.map(s=>{ const p=pts.reduce((a,q)=>Math.abs(q.u-s.ut)<Math.abs(a.u-s.ut)?q:a); return `<circle cx="${X(s.ut).toFixed(1)}" cy="${Y(p.l).toFixed(1)}" r="3.2" class="cw"/><text x="${X(s.ut).toFixed(1)}" y="${(Y(p.l)-7).toFixed(1)}" text-anchor="middle">wuqūf</text>`; }).join('')}
+    <line x1="${X(t.ut)}" x2="${X(t.ut)}" y1="8" y2="${H2-12}" class="cn"/><text x="${X(t.ut)+3}" y="${H2-3}">now</text></svg>`;
+  $('cls-note').innerHTML=`White: moving east (istiqāma). Red: turning back (rujūʿ). Dots: stations (wuqūf). Dashed: distance from Earth, so the backward stretch sits at the bottom of the descent.${st.length?' Stations: '+st.map(s=>`${fd(s.ut)} (turns ${s.turn})`).join(', ')+'.':''}`; }
 function readouts(t){
   const b=BMAP[state.sel], il=A.Illumination(b.key,t), dist=pos[b.key].d;
   const eq=A.EquatorFromVector(A.GeoVector(b.key,t,true)), con=A.Constellation(eq.ra,eq.dec);
@@ -940,7 +999,7 @@ function readouts(t){
   rows.push(['Brightness',`mag ${il.mag.toFixed(2)}`]);
   rows.push(['Motion', b.key==='Sun'||b.key==='Moon' ? `${dl.toFixed(2)}° / day` : (dl<0? `<span class="pill" style="color:var(--warn)">retrograde</span> ${dl.toFixed(3)}°/d` : `direct ${dl.toFixed(3)}°/d`)]);
   document.getElementById('ro').innerHTML=rows.map(([k,v])=>`<div class="${k==='Sky position'||k==='Motion'||k==='In the figure of'?'wide':''}"><dt>${k}</dt><dd>${v}</dd></div>`).join('');
-  drawScope(t,b,il);
+  drawScope(t,b,il); try{ classicalCard(t); }catch(e){ console.error(e); }
   const list=BODIES.map(x=>({b:x,d:pos[x.key].d})).sort((p,q)=>p.d-q.d), maxd=Math.max(...list.map(x=>x.d)); const cross=[];
   document.getElementById('order').innerHTML=list.map((x,i)=>{ const cr=x.b.n!==i+1; if(cr) cross.push(x.b.en);
     const w=Math.max(2, Math.log10(1+x.d*400)/Math.log10(1+maxd*400)*100);
@@ -1077,6 +1136,8 @@ layer('l-zod',v=>{zodGroup.visible=v; state.showZod=v;});
 layer('l-signs',v=>{signGroup.visible=v; state.showSigns=v;});
 layer('l-stars',v=>state.showStarNames=v);
 layer('l-hold',v=>{ holdGroup.visible=v; magGroup.visible=v; state.showHold=v; if(v && state.intro===null) toast('Earth stays still because the forces on it balance: the pull of the Sun and Moon is matched exactly by the field of the sky’s yearly swing, so the net force at its centre is zero. Classical authors pictured this as iron held among magnets. Earth’s real magnetic field shields it from the solar wind but does not hold it in place.',9000); });
+layer('l-asc',v=>{ state.showAsc=v; clsKey=''; if(!v){ [...planetShells,...flexShells].forEach(m=>m.material.uniforms.uC.value.set(0xc6d4ff)); BODIES.forEach(b=>{ const t=b.lbl.querySelector('.ctag'); if(t) t.remove(); }); signLabels.forEach((s,k)=>{ s.el.innerHTML=s.html; s.el.classList.remove('lit'); }); }
+  else if(state.intro===null) toast('Rising (ṣuʿūd) spheres glow gold, descending (hubūṭ) spheres glow blue. Labels show istiqāma, wuqūf or rujūʿ, and the sign band shows each planet’s houses and exaltation.',6500); });
 layer('l-elem',v=>{elemVol.visible=v; state.showElem=v; if(v && state.uTarget<.5 && state.intro===null) toast('The four elements fill the sublunar region. With measured distances the Moon is close, so the layer is thin; switch to round spheres to see it fully.',5200);});
 layer('l-outer',v=>OUTER.forEach(o=>o.mesh.visible=v));
 layer('l-glow',v=>bloom.enabled=v);
@@ -1264,6 +1325,7 @@ function tick(now){
   $('clock-s').textContent=`${$('t-rate').selectedOptions[0].text}${state.dir<0?', reversed':''}${state.playing?'':', paused'}`;
   if(frame%6===0) uiFrame();
   if(now>readoutDue && state.intro===null && (!$('right').classList.contains('min') || activePane==='light')){ readouts(t); readoutDue=now+250; }
+  if(state.showAsc && state.intro===null && frame%10===0) applyClassical(state.ut);
   requestAnimationFrame(tick);
 }
 
